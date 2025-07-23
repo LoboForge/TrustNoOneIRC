@@ -1,0 +1,59 @@
+﻿@using TNO.mIRC.Models
+@inject IJSRuntime JSRuntime
+
+@if (Conversation is null)
+{
+    <div class="pm-window-content">No conversation loaded.</div>
+}
+else
+{
+    <div class="private-message-window d-flex flex-column">
+        <div class="pm-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
+            @foreach (var msg in Conversation.Messages)
+            {
+                <div class="pm-message">
+                    <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                    <span class="user">@msg.Sender.Nickname:</span>
+                    <span class="text">@msg.Content</span>
+                </div>
+            }
+        </div>
+
+        <div class="chat-input mt-1">
+            <input type="text"
+                   @bind-value="CurrentMessage"
+                   @bind-value:event="oninput"
+                   @onkeydown="HandleKey"
+                   placeholder="Type your message..." />
+            <button @onclick="SendMessage">Send</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public PrivateConversation Conversation { get; set; } = default!;
+
+    private string CurrentMessage = "";
+    private ElementReference MessagesDiv;
+
+    private void HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            SendMessage();
+    }
+
+    private void SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(CurrentMessage))
+        {
+            Common.ircClient.SendMessageAsync(Conversation.User.Nickname, CurrentMessage);
+            Conversation.Messages.Add(new ChatMessage(DateTime.Now, new IrcUser(Common.ircClient.Nick), Conversation.User.Nickname, CurrentMessage, false));
+            CurrentMessage = "";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
+    }
+}

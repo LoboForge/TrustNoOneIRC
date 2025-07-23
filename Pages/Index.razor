@@ -1,0 +1,251 @@
+﻿@page "/"
+@using TNO.mIRC.Models
+
+<div class="desktop">
+    @foreach (var window in OpenWindows)
+    {
+        <HackerWindow Title="@window.Title"
+                      OnCloseClicked='@(() => HandleWindowClose(window))'>
+            @window.ChildContent
+        </HackerWindow>
+    }
+
+
+    <div class="desktop-dock">
+        <div class="dock-icon" title="Connection" @onclick="ToggleConnectionWindow">
+            <span class="oi oi-cloud"></span>
+        </div>
+        <div class="dock-icon" title="Join Channel" @onclick="JoinChannelWindow">
+            <span class="oi oi-plus"></span>
+        </div>
+        <div class="dock-icon" title="IRC Log" @onclick="ToggleCommandWindow">
+            <span class="oi oi-terminal"></span>
+        </div>
+        <div class="dock-icon" title="IRC Log" @onclick="ToggleLogWindow">
+            <span class="oi oi-terminal"></span>
+        </div>
+
+        @foreach (var channel in Common.ircClient.JoinedChannels)
+        {
+            <div class="dock-icon" title="@channel.Name" @onclick="() => OpenChatWindow(channel)">
+                <span class="oi oi-chat"></span>
+                @if (channel.HasUnread)
+                {
+                    <span class="badge">@channel.UnreadCount</span>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Window> OpenWindows = new();
+    private readonly List<PrivateConversation> PMs = new();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        EventBus.Subscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
+        EventBus.Subscribe<RequestPrivateMessageEvent>(HandlePmRequest);
+        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
+        {
+            var user = evt.Sender;
+
+            var convo = PMs.FirstOrDefault(p => p.User.Nickname == user.Nickname);
+            if (convo == null)
+            {
+                convo = new PrivateConversation(user);
+                PMs.Add(convo);
+
+                OpenPrivateMessageWindow(convo);
+            }
+
+            convo.Messages.Add(evt.Message);
+        });
+    }
+    private void HandlePmRequest(RequestPrivateMessageEvent evt)
+    {
+        var user = evt.Target;
+
+        var convo = PMs.FirstOrDefault(p => p.User.Nickname == user.Nickname);
+        if (convo == null)
+        {
+            convo = new PrivateConversation(user);
+            PMs.Add(convo);
+        }
+
+        OpenPrivateMessageWindow(convo);
+        StateHasChanged();
+    }
+    private void HandleWindowClose(Window window)
+    {
+        // Channel-specific cleanup
+        if (window.Type == WindowType.Channel)
+        {
+            var channel = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == window.Title);
+            if (channel != null)
+            {
+                Common.ircClient.LeaveChannel(channel.Name, "Leaving...");
+                Common.ircClient.JoinedChannels.Remove(channel);
+            }
+        }
+
+        RemoveWindowById(window.ID);
+    }
+
+    private void OpenPrivateMessageWindow(PrivateConversation convo)
+    {
+        if (OpenWindows.Any(w => w.Title == convo.User.Nickname)) return;
+
+        var fragment = new RenderFragment(builder =>
+        {
+            builder.OpenComponent(0, typeof(PrivateMessageWindow));
+            builder.AddAttribute(1, "Conversation", convo);
+            builder.CloseComponent();
+        });
+
+        OpenWindows.Add(new Window
+        {
+            Title = convo.User.Nickname,
+            Type = WindowType.PM,
+            ChildContent = fragment
+        });
+    }
+    private void OpenChatWindow(IrcChannel channel)
+    {
+        if (OpenWindows.Any(w => w.Title == channel.Name)) return;
+
+        var window = new Window
+        {
+            Title = channel.Name,
+            Type = WindowType.Channel,
+
+        };
+        window.ChildContent = builder =>
+        {
+            builder.OpenComponent(0, typeof(ChatWindow));
+            builder.AddAttribute(1, "Channel", channel);
+            builder.AddAttribute(2, "OnClose", EventCallback.Factory.Create(this, () =>
+            {
+                HandleWindowClose(window);
+            }));
+            builder.CloseComponent();
+        };
+
+        OpenWindows.Add(window);
+    }
+    void RemoveWindowById(string id)
+    {
+        OpenWindows.RemoveAll(w => w.ID == id);
+    }
+
+    private async void HandleSelfJoinedChannel(SelfJoinedChannelEvent evt)
+    {
+        var channel = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == evt.Channel);
+        if (channel is not null)
+        {
+            await InvokeAsync(() =>
+            {
+                OpenChatWindow(channel);
+                StateHasChanged();
+            });
+        }
+    }
+
+    private void CloseChatWindow(IrcChannel channel)
+    {
+        var joined = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == channel.Name);
+        if (joined != null)
+        {
+            Common.ircClient.LeaveChannel(joined.Name, "Leaving...");
+            Common.ircClient.JoinedChannels.Remove(joined);
+        }
+
+    }
+
+    public void Dispose()
+    {
+        EventBus.Unsubscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
+    }
+
+    private void ToggleConnectionWindow(MouseEventArgs args)
+    {
+        var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Settings);
+        if (logwindow != null) OpenWindows.Remove(logwindow);
+        else {
+            var window = new Window
+                {
+                    Title = "IRC Connection",
+                    Type = WindowType.Settings,
+                    ChildContent = builder =>
+                    {
+                        builder.OpenComponent(0, typeof(ConnectionWindow));
+                        builder.CloseComponent();
+                    }
+                };
+
+            OpenWindows.Add(window);
+        }
+    }
+    private void ToggleCommandWindow(MouseEventArgs args)
+    {
+        var commandwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Commands);
+        if (commandwindow != null) OpenWindows.Remove(commandwindow);
+        else
+        {
+            var window = new Window
+            {
+                Title = "Commands",
+                Type = WindowType.Settings,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(RawCommandWindow));
+                    builder.CloseComponent();
+                }
+            };
+
+
+            OpenWindows.Add(window);
+        }
+    }
+    private void ToggleLogWindow(MouseEventArgs args)
+    {
+        var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Log);
+        if (logwindow != null) OpenWindows.Remove(logwindow);
+        else
+        {
+            var window = new Window
+            {
+                Title = "IRC Log",
+                Type = WindowType.Log,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(IrcLog));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+        }
+    }
+    private void JoinChannelWindow(MouseEventArgs args)
+    {
+        var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Join);
+        if (logwindow != null) OpenWindows.Remove(logwindow);
+        else
+        {
+            var window = new Window
+            {
+                Title = "Channels",
+                Type = WindowType.Join,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(ChannelBrowser));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+        }
+    }
+}

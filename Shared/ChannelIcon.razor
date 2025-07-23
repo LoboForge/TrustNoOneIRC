@@ -1,0 +1,17 @@
+﻿@using TNO.mIRC.Models
+<div class="channel-icon" @onclick="HandleClick">
+    <div class="icon-avatar">@GetInitial()</div>
+    <div class="icon-name">@Channel.Name</div>
+    @if (Channel.HasUnread)
+    {
+        <span class="badge bg-success">@Channel.UnreadCount</span>
+    }
+</div>
+
+@code {
+    [Parameter] public IrcChannel Channel { get; set; } = default!;
+    [Parameter] public EventCallback<IrcChannel> OnOpen { get; set; }
+
+    private void HandleClick() => OnOpen.InvokeAsync(Channel);
+    private string GetInitial() => string.IsNullOrWhiteSpace(Channel.Name) ? "?" : Channel.Name[1].ToString().ToUpper();
+}

@@ -1,0 +1,138 @@
+﻿@using TNO.mIRC.Models
+
+@if (Channel is null)
+{
+
+        <div class="chat-window-content">No channel loaded.</div>
+
+}
+else
+{
+
+
+        <div class="chat-window-content d-flex flex-column">
+
+
+            <div class="flex-grow-1 d-flex overflow-hidden">
+                @if (ShowUserList)
+                {
+                    <div class="user-list border-end pe-2 me-2" style="width: 160px; overflow-y: auto;">
+                        @foreach (var user in Channel.Users.OrderBy(u => u.Nickname))
+                        {
+                            <div class="user-entry" @onclick="() => StartPm(user)">@user.Nickname</div>
+                        }
+                    </div>
+                }
+
+                <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
+                    @foreach (var msg in Channel.Messages)
+                    {
+                        if (!msg.IsAction)
+                        {
+                            <div class="chat-message">
+                                <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                                <span class="user">@msg.Sender.Nickname:</span>
+                                <span class="text">@msg.Content</span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="chat-message">
+                                <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                                <span class="user" style="font-weight:bold;">** @msg.Sender.Nickname @msg.Content **</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        <div style="position:absolute; bottom:50px; left:10px; width:90%; background-color:transparent;">
+            
+            <button @onclick="ToggleUserList">👥</button>
+        </div>
+            <div class="chat-input mt-1">
+            <input type="text"
+                   @bind-value="CurrentMessage"
+                   @bind-value:event="oninput"
+                   @onkeydown="HandleKey"
+                   placeholder="Type your message..." />
+                <button @onclick="SendMessage">Send</button>
+            </div>
+        </div>
+    
+}
+
+
+
+@code {
+    [Parameter] public IrcChannel Channel { get; set; } = default!;
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private async Task CloseWindow()
+    {
+        await OnClose.InvokeAsync();
+    }
+    private string CurrentMessage = "";
+    private ElementReference MessagesDiv;
+    private bool ShowUserList = true;
+
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        EventBus.Subscribe<ChannelMessageReceivedEvent>(HandleNewMessage);
+    }
+    private void StartPm(IrcUser user)
+    {
+        EventBus.Publish(new RequestPrivateMessageEvent(user));
+    }
+    private void ToggleUserList()
+    {
+        ShowUserList = !ShowUserList;
+    }
+    private async void HandleNewMessage(ChannelMessageReceivedEvent evt)
+    {
+        if (!string.Equals(evt.Target, Channel.Name, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        await InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await Task.Delay(50);
+            await ScrollToBottom();
+        });
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+            Channel.LastChecked = DateTime.UtcNow;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await ScrollToBottom();
+    }
+
+    private void SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(CurrentMessage))
+        {
+            Common.ircClient.SendMessageAsync(Channel.Name, CurrentMessage);
+            CurrentMessage = "";
+        }
+    }
+
+    private void HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            SendMessage();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
+    }
+
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+}

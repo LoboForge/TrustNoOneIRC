@@ -1,0 +1,31 @@
+﻿
+<div class="irc-log">
+    @{ 
+
+        foreach (var message in Messages)
+        {
+            <div class="log-line">@message</div>
+        }
+    }
+</div>
+
+@code {
+    List<string> Messages = Common.ircClient.ServerMessages.ToList();
+
+    protected override void OnInitialized()
+    {
+        
+        EventBus.Subscribe<ServerMessage>(HandleMessage);
+    }
+
+    private void HandleMessage(ServerMessage message)
+    {
+        Messages = Common.ircClient.ServerMessages.ToList();
+        InvokeAsync(StateHasChanged); // trigger UI refresh
+    }
+
+    public void Dispose()
+    {
+        EventBus.Unsubscribe<ServerMessage>(HandleMessage);
+    }
+}

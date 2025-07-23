@@ -1,0 +1,196 @@
+﻿@using TNO.mIRC.Models
+@using TNO.mIRC.Services
+@implements IDisposable
+
+<div class="container mt-3">
+    <h4>IRC Server Profiles</h4>
+
+    <div class="mb-3 d-flex align-items-center gap-3">
+        <select class="form-select w-auto" @bind="SelectedIndex">
+            @for (int i = 0; i < Config.Servers.Count; i++)
+            {
+                <option value="@i">@Config.Servers[i].Name</option>
+            }
+        </select>
+
+        <button class="btn btn-sm btn-outline-primary" @onclick="AddNewServer">➕ New</button>
+        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteCurrentServer" disabled="@(!CanDelete)">🗑️ Delete</button>
+    </div>
+
+    @if (SelectedServer != null)
+    {
+        <div class="mb-3">
+            <label class="form-label">Profile Name</label>
+            <input class="form-control" @bind="SelectedServer.Name" />
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Host</label>
+                <input class="form-control" @bind="SelectedServer.Host" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Port</label>
+                <input class="form-control" type="number" @bind="SelectedServer.Port" />
+            </div>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-6">
+                <label class="form-label">Nick</label>
+                <input class="form-control" @bind="SelectedServer.Nick" />
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label">User</label>
+                <input class="form-control" @bind="SelectedServer.User" />
+            </div>
+        </div>
+
+        <div class="form-check form-switch mt-4">
+            <input class="form-check-input" type="checkbox" id="useTor" @bind="SelectedServer.UseTor">
+            <label class="form-check-label" for="useTor">Use Tor Proxy</label>
+        </div>
+
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="useTls" @bind="SelectedServer.UseTls">
+            <label class="form-check-label" for="useTls">Use TLS</label>
+        </div>
+
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="useSasl" @bind="SelectedServer.UseSasl">
+            <label class="form-check-label" for="useSasl">Use SASL</label>
+        </div>
+
+        @if (SelectedServer.UseSasl)
+        {
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">SASL Username</label>
+                    <input class="form-control" @bind="SelectedServer.SaslUsername" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label">SASL Password</label>
+                    <input type="password" class="form-control" @bind="SelectedServer.SaslPassword" />
+                </div>
+            </div>
+
+            <div class="form-check form-switch mt-3">
+                <input class="form-check-input" type="checkbox" id="useCert" @bind="SelectedServer.UseClientCert">
+                <label class="form-check-label" for="useCert">Use Client Certificate</label>
+            </div>
+
+            @if (SelectedServer.UseClientCert)
+            {
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Client Cert Path</label>
+                        <input class="form-control" @bind="SelectedServer.ClientCertPath" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Client Cert Password</label>
+                        <input type="password" class="form-control" @bind="SelectedServer.ClientCertPassword" />
+                    </div>
+                </div>
+            }
+        }
+
+        <div class="mt-4 d-flex gap-3">
+            <button class="btn btn-primary" @onclick="Connect">🔌 Connect</button>
+            <button class="btn btn-outline-secondary" @onclick="SaveProfile">💾 Save</button>
+        </div>
+    }
+</div>
+
+@code {
+    private AppConfig Config = new();
+    private int SelectedIndex = 0;
+    private bool disposedValue;
+
+    private IrcServerProfile? SelectedServer =>
+    (SelectedIndex >= 0 && SelectedIndex < Config.Servers.Count)
+        ? Config.Servers[SelectedIndex]
+        : null;
+
+    private bool CanDelete => Config.Servers.Count > 1;
+
+    protected override void OnInitialized()
+    {
+        Config = ConfigService.Load();
+    }
+
+    private void AddNewServer()
+    {
+        Config.Servers.Add(new IrcServerProfile { Name = $"New Server {Config.Servers.Count + 1}" });
+        SelectedIndex = Config.Servers.Count - 1;
+        ConfigService.Save(Config);
+    }
+
+    private void DeleteCurrentServer()
+    {
+        if (CanDelete)
+        {
+            Config.Servers.RemoveAt(SelectedIndex);
+            SelectedIndex = Math.Max(0, SelectedIndex - 1);
+            ConfigService.Save(Config);
+        }
+    }
+
+    private void SaveProfile()
+    {
+        ConfigService.Save(Config);
+    }
+
+    private void Connect()
+    {
+        var s = SelectedServer;
+        if (s == null) return;
+
+        var options = new IrcConnectionOptions
+        {
+            UseTor = s.UseTor,
+            UseTls = s.UseTls,
+            UseSasl = s.UseSasl,
+            SaslUsername = s.SaslUsername,
+            SaslPassword = s.SaslPassword,
+            ClientCertPath = s.UseClientCert ? s.ClientCertPath : null,
+            ClientCertPassword = s.UseClientCert ? s.ClientCertPassword : null
+        };
+
+        Common.ircClient = new IrcClientService(
+            host: s.Host,
+            port: s.Port,
+            nick: s.Nick,
+            user: s.User,
+            dispatcher: Common.Dispatcher,
+            options: options
+        );
+
+        ConfigService.Save(Config);
+        Common.ircClient.StartService();
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                // TODO: dispose managed state (managed objects)
+            }
+
+            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+            // TODO: set large fields to null
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+}

@@ -1,0 +1,35 @@
+﻿@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
+
+<div @ref="windowRef" class="hacker-window" @onmousedown="@(() => BringToFront())">
+    <div class="title-bar" @onmousedown="StartDrag">
+        <span>@Title</span>
+        <button class="close-btn" @onclick="OnClose">✕</button>
+    </div>
+    <div class="content">
+        @ChildContent
+    </div>
+    <div class="resizer" @onmousedown="StartResize"></div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "Surveillance Feed";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnCloseClicked { get; set; }
+
+    private ElementReference windowRef;
+
+    private async void OnClose()
+    {
+        await OnCloseClicked.InvokeAsync();
+    }
+
+    private async void StartDrag(MouseEventArgs e) =>
+        await JSRuntime.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, e.ClientX, e.ClientY);
+
+    private async void StartResize(MouseEventArgs e) =>
+        await JSRuntime.InvokeVoidAsync("hackerWindowInterop.startResize", windowRef, e.ClientX, e.ClientY);
+
+    private async void BringToFront() =>
+        await JSRuntime.InvokeVoidAsync("hackerWindowInterop.bringToFront", windowRef);
+}

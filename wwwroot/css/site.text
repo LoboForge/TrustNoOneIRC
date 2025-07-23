@@ -1,0 +1,510 @@
+﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+}
+/* --- Blazor error UI (leave alone if still needed) --- */
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,...your-icon...) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred."
+    }
+
+/* --- Desktop Layout --- */
+.desktop-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.95);
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+}
+
+.desktop-header {
+    display: flex;
+    align-items: center;
+    background-color: rgba(0, 255, 0, 0.05);
+    border-bottom: 1px solid rgba(0, 255, 0, 0.1);
+    padding: 0.5rem 1rem;
+}
+
+.desktop-logo {
+    height: 40px;
+    margin-right: 1rem;
+}
+
+.desktop-branding {
+    display: flex;
+    flex-direction: column;
+}
+
+.desktop-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #00ff88;
+}
+
+.desktop-subtitle {
+    font-size: 0.75rem;
+    color: #44ff44;
+}
+
+.desktop-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* --- Channel List Sidebar --- */
+.tno-sidebar {
+    width: 220px;
+    background-color: rgba(0, 255, 0, 0.03);
+    border-right: 1px solid rgba(0, 255, 0, 0.1);
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+/* --- Chat Desktop Area --- */
+.desktop-content {
+    flex: 1;
+    position: relative;
+    padding: 1rem;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* --- System Log Panel --- */
+.desktop-log-panel {
+    width: 320px;
+    background-color: rgba(0, 0, 0, 0.9);
+    border-left: 1px solid rgba(0, 255, 0, 0.1);
+    padding: 0.5rem;
+    overflow-y: auto;
+}
+
+    /* --- Scrollbars --- */
+    .desktop-log-panel::-webkit-scrollbar,
+    .tno-sidebar::-webkit-scrollbar,
+    .desktop-content::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .desktop-log-panel::-webkit-scrollbar-thumb,
+    .tno-sidebar::-webkit-scrollbar-thumb,
+    .desktop-content::-webkit-scrollbar-thumb {
+        background-color: #008800;
+        border-radius: 4px;
+    }
+
+/* --- IRC Log Styling --- */
+.irc-log {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 100%;
+}
+
+.log-line {
+    white-space: pre-wrap;
+    line-height: 1.2;
+    margin-bottom: 2px;
+    font-size: 11px;
+}
+
+    .log-line:hover {
+        background-color: #001a00;
+        z-index: 1;
+    }
+
+/* --- Channel Controls + List --- */
+.channel-controls {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+}
+
+    .channel-controls input {
+        flex-grow: 1;
+        background-color: #111;
+        color: #8fe1dd;
+        border: 1px solid #2a2a2a;
+        padding: 0.4rem;
+        font-family: monospace;
+        font-size: 0.85rem;
+    }
+
+    .channel-controls button {
+        background-color: #1da49f;
+        color: black;
+        padding: 0.4rem 0.7rem;
+        border: none;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+.channel-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+    .channel-list li {
+        border-bottom: 1px solid #1e2e2e;
+        padding: 0.5rem 0;
+    }
+
+.chan-name {
+    font-weight: bold;
+    color: #8fe1dd;
+}
+
+.chan-topic {
+    font-size: 0.85rem;
+    color: #66b2a8;
+    margin-bottom: 0.25rem;
+}
+
+.channel-list button {
+    background-color: #1da49f;
+    color: black;
+    padding: 0.3rem 0.5rem;
+    border: none;
+    cursor: pointer;
+}
+
+/* --- Channel Icon "Desktop" Grid --- */
+.channel-icon {
+    width: 80px;
+    height: 80px;
+    background: rgba(0,255,0,0.05);
+    border: 1px solid rgba(0,255,0,0.2);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0.5rem;
+    position: relative;
+    cursor: pointer;
+}
+
+    .channel-icon:hover {
+        background-color: rgba(0, 255, 0, 0.1);
+    }
+
+.icon-avatar {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.icon-name {
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+}
+
+/* --- Chat Window Base --- */
+.chat-window {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 320px;
+    min-height: 240px;
+    background-color: rgba(0, 0, 0, 0.85);
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+
+
+.chat-window-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.1rem;
+    min-height: 0; /* ✨ Required so flex/scrolling works properly */
+}
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.1rem;
+}
+
+.chat-message {
+
+}
+
+.timestamp {
+    color: #00aa00;
+
+}
+
+.user {
+    color: #00ff00;
+    font-weight: bold;
+
+}
+
+.text {
+    color: #b2ffb2;
+}
+
+.chat-input {
+    display: flex;
+    border-top: 1px solid #00ff00;
+}
+
+    .chat-input input {
+        flex: 1;
+        background-color: black;
+        color: #00ff00;
+        border: none;
+        padding: 0.5rem;
+        font-family: monospace;
+    }
+
+    .chat-input button {
+        background-color: #00ff00;
+        color: black;
+        border: none;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+    }
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #00ff00;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.channel-icon i {
+    font-size: 1.75rem;
+    margin-bottom: 0.2rem;
+}
+
+
+.desktop {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden; /* ✨ Prevents scrollbars */
+    position: relative;
+    background-color: rgba(0, 0, 0, 0.95);
+}
+
+
+
+.desktop-dock {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100px;
+    display: flex;
+    align-items: end;
+    gap: 1rem;
+    padding: 1rem 2rem;
+    background: rgba(0, 255, 0, 0.03);
+    backdrop-filter: blur(4px);
+    border-top: 1px solid rgba(0, 255, 0, 0.1);
+    z-index: 10;
+}
+.desktop-content {
+    margin-top:20px;
+    width:100%; 
+    height:90%;
+    overflow:hidden;
+}
+.dock-icon {
+    width: 60px;
+    height: 60px;
+    background-color: rgba(0, 255, 0, 0.05);
+    border: 1px solid rgba(0, 255, 0, 0.15);
+    color: #00ff00;
+    font-family: monospace;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.2s ease;
+}
+
+    .dock-icon:hover {
+        transform: scale(1.3);
+        background-color: rgba(0, 255, 0, 0.1);
+    }
+
+    .dock-icon .badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        background-color: #00ff00;
+        color: black;
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        border-radius: 8px;
+    }
+.irc-log {
+    max-height: 100%;
+    overflow-y: auto;
+    font-size: 12px;
+}
+
+.desktop-tiling-area {
+    display: flex;
+    flex-wrap: wrap;
+    overflow: auto;
+}
+
+
+.tiled-window {
+    position: relative; /* ← was absolute */
+    width: 100%;
+    height: 100%;
+}
+
+/* --- Chat Window Base --- */
+.chat-window {
+    position: relative;
+    min-height: 300px;
+    background-color: rgba(0, 0, 0, 0.85);
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 360px;
+    overflow: hidden;
+}
+
+
+/* --- Chat Window Parts --- */
+.chat-window-header {
+    background-color: rgba(0, 255, 0, 0.05);
+    padding: 0.4rem;
+    border-bottom: 1px solid #00ff00;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+}
+
+.chat-window-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.5rem;
+    min-height: 0;
+}
+
+.chat-input {
+    display: flex;
+    border-top: 1px solid #00ff00;
+}
+
+    .chat-input input {
+        flex: 1;
+        background-color: black;
+        color: #00ff00;
+        border: none;
+        padding: 0.5rem;
+        font-family: monospace;
+    }
+
+    .chat-input button {
+        background-color: #00ff00;
+        color: black;
+        border: none;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+    }
+
+/* --- Tiling Area --- */
+.desktop-tiling-area {
+    display: flex;
+    flex-wrap: wrap;
+    overflow-y: auto;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+
+.tiled-window {
+    width: 100%;
+    height: 100%;
+}
+
+.terminal-input {
+    background-color: black;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.5rem;
+}
+
+.resize-btn {
+    background: transparent;
+    border: none;
+    color: #00ff00;
+    font-size: 1rem;
+    cursor: pointer;
+    margin-left: 0.25rem;
+}
+
+.chat-window.expand-width {
+    grid-column: span 2;
+}
+
+.chat-window.expand-height {
+    grid-row: span 2;
+}
+
+/* Optional cap to prevent infinite growth */
+@media (min-width: 768px) {
+    .desktop-tiling-area {
+        grid-auto-rows: 360px;
+    }
+}
+.extra-tall {
+    grid-row: span 2;
+}
+    .extra-tall .chat-window {
+        height: 620px;
+    }

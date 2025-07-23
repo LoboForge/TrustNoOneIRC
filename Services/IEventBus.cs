@@ -1,0 +1,39 @@
+﻿using System.Collections.Concurrent;
+using TNO.mIRC.Services;
+
+public static class EventBus
+{
+    private static readonly ConcurrentDictionary<Type, List<Delegate>> _handlers = new();
+
+    public static void Publish<T>(T @event) where T : class
+    {
+        if (_handlers.TryGetValue(typeof(T), out var delegates))
+        {
+            foreach (var handler in delegates.OfType<Action<T>>())
+            {
+                handler(@event);
+            }
+        }
+    }
+
+    public static void Subscribe<T>(Action<T> handler) where T : class
+    {
+        var list = _handlers.GetOrAdd(typeof(T), _ => new List<Delegate>());
+        lock (list)
+        {
+            if (!list.Contains(handler))
+                list.Add(handler);
+        }
+    }
+
+    public static void Unsubscribe<T>(Action<T> handler) where T : class
+    {
+        if (_handlers.TryGetValue(typeof(T), out var list))
+        {
+            lock (list)
+            {
+                list.Remove(handler);
+            }
+        }
+    }
+}

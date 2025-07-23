@@ -1,0 +1,115 @@
+﻿@using TNO.mIRC.Models
+
+<div class="channel-browser">
+
+    <!-- Join/Create Channel Input -->
+    <div class="channel-controls d-flex mb-2">
+        <input type="text" @bind="ChannelName" placeholder="#channel-name" />
+        <button @onclick="JoinOrCreateChannel">Join</button>
+        <button @onclick="RefreshChannelList" class="ms-auto">Refresh</button>
+    </div>
+
+    <!-- Joined Channels (Fixed Section) -->
+    @if (Joined.Any())
+    {
+        <div class="joined-channels">
+            <h4>Joined Channels</h4>
+            <ul class="channel-list joined">
+                @foreach (var chan in Joined)
+                {
+                    <li @onclick="() => SelectChannel(chan.Name)">
+                        @chan.Name
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- Channel Filter -->
+    <div class="channel-filter d-flex align-items-center mb-2">
+        <input type="text" @bind="ChannelFilter" placeholder="Search channels..." />
+    </div>
+
+    <!-- Available Channels (Filtered) -->
+    <div class="available-channels">
+        <h4>Available Channels</h4>
+        <ul class="channel-list available">
+            @foreach (var chan in FilteredChannels)
+            {
+                <li>
+                    <div class="chan-header d-flex justify-content-between">
+                        <span class="chan-name">@chan.Name (@chan.UserCount)</span>
+                        <button @onclick="() => JoinChannel(chan.Name)">Join</button>
+                    </div>
+                    <div class="chan-topic">@chan.Topic</div>
+                </li>
+            }
+        </ul>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private string ChannelName = "";
+    private List<IrcChannel> Joined => Common.ircClient.JoinedChannels;
+    private List<IrcChannel> Available => Common.ircClient.AvailableChannels;
+    private string ChannelFilter = "";
+
+    private IEnumerable<IrcChannel> FilteredChannels =>
+        string.IsNullOrWhiteSpace(ChannelFilter)
+            ? Available
+            : Available.Where(c =>
+                (c.Name?.Contains(ChannelFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                (c.Topic?.Contains(ChannelFilter, StringComparison.OrdinalIgnoreCase) ?? false));
+
+    private void JoinOrCreateChannel()
+    {
+        if (string.IsNullOrWhiteSpace(ChannelName)) return;
+        JoinChannel(ChannelName);
+    }
+
+    private void JoinChannel(string name)
+    {
+        var target = name.Trim();
+        if (!target.StartsWith("#"))
+            target = "#" + target;
+
+        Common.ircClient.JoinChannelAsync(target);
+        ChannelName = "";
+    }
+
+
+    private void RefreshChannelList()
+    {
+        Common.ircClient.RequestChannelListAsync();
+    }
+
+    private void SelectChannel(string channel)
+    {
+        // TODO: handle channel selection logic
+    }
+
+    protected override void OnInitialized()
+    {
+        EventBus.Subscribe<ServerMessage>(OnServerMessage);
+        EventBus.Subscribe<EndOfListEvent>(OnChannelList);
+    }
+
+    private void OnServerMessage(ServerMessage msg)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnChannelList(EndOfListEvent list)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        EventBus.Unsubscribe<ServerMessage>(OnServerMessage);
+        EventBus.Unsubscribe<EndOfListEvent>(OnChannelList);
+    }
+}

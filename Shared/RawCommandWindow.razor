@@ -1,0 +1,46 @@
+﻿
+<div class="card p-3 bg-dark text-light">
+    <h5>Raw IRC Command</h5>
+
+    <input type="text"
+           class="form-control mb-2"
+           @bind="CommandText"
+           @bind:event="oninput"
+           placeholder="Enter command like /join #test"
+           @onkeydown="HandleKeyPress" />
+
+    <button class="btn btn-primary" @onclick="SendCommand">Send</button>
+
+    @if (!string.IsNullOrWhiteSpace(LastSent))
+    {
+        <div class="mt-2 text-muted">
+            Last: <code>@LastSent</code>
+        </div>
+    }
+</div>
+
+@code {
+    private string CommandText = string.Empty;
+    private string LastSent = string.Empty;
+
+    private async Task SendCommand()
+    {
+        if (string.IsNullOrWhiteSpace(CommandText)) return;
+
+        var raw = CommandText.StartsWith("/")
+            ? CommandText[1..]
+            : CommandText;
+
+        await Common.ircClient.SendRawAsync(raw);
+        LastSent = raw;
+        CommandText = string.Empty;
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendCommand();
+        }
+    }
+}
