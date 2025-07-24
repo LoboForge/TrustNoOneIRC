@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using TNO.mIRC;
 
 public static class ConfigService
 {
@@ -6,23 +7,26 @@ public static class ConfigService
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "TNO.mIRC", "config.json");
 
-    public static AppConfig Load()
+    public static void Load()
     {
         if (File.Exists(ConfigPath))
         {
             var json = File.ReadAllText(ConfigPath);
-            return JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
+            Common.Config = JsonSerializer.Deserialize<AppConfig>(json);
         }
-        return new AppConfig();
+        else
+        {
+            Common.Config = new AppConfig();
+        }
     }
 
-    public static void Save(AppConfig config)
+    public static void Save()
     {
         var dir = Path.GetDirectoryName(ConfigPath)!;
         if (!Directory.Exists(dir))
             Directory.CreateDirectory(dir);
 
-        var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+        var json = JsonSerializer.Serialize(Common.Config, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(ConfigPath, json);
     }
 }

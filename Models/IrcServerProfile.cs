@@ -15,6 +15,7 @@
         public string? ClientCertPath { get; set; }
         public string? ClientCertPassword { get; set; }
         public bool UseClientCert { get; set; }
+        public List<string> AutoJoinChannels { get; set; }
     }
 
 

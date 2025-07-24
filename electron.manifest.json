@@ -1,0 +1,35 @@
+{
+  "executable": "TNO.mIRC",
+  "splashscreen": {
+    "imageFile": ""
+  },
+  "name": "TNO.mIRC",
+  "author": "",
+  "singleInstance": false,
+  "environment": "Development",
+  "build": {
+    "appId": "com.TNO.mIRC.app",
+    "productName": "TNO.mIRC",
+    "copyright": "Copyright © 2020",
+    "buildVersion": "1.0.0",
+    "compression": "maximum",
+    "directories": {
+      "output": "../../../bin/Desktop"
+    },
+    "extraResources": [
+      {
+        "from": "./bin",
+        "to": "bin",
+        "filter": [ "**/*" ]
+      }
+    ],
+    "files": [
+      {
+        "from": "./node_modules",
+        "to": "node_modules",
+        "filter": [ "**/*" ]
+      },
+      "**/*"
+    ]
+  }
+}

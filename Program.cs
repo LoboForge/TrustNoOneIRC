@@ -1,42 +1,65 @@
+using ElectronNET.API;
+using ElectronNET.API.Entities;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Http.Connections;
 using TNO.mIRC;
 using TNO.mIRC.Data;
 using TNO.mIRC.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Electron.NET bootstrapping
+builder.WebHost.UseElectron(args);
+builder.WebHost.UseEnvironment("Development");
+
+// Blazor services
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
-
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Error handling
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
 }
 
-
 app.UseStaticFiles();
-
 app.UseRouting();
 
-app.MapBlazorHub();
+app.MapBlazorHub(options =>
+{
+    options.Transports = HttpTransportType.WebSockets;
+});
 app.MapFallbackToPage("/_Host");
 
+// Set up IRC client
 Common.ircClient = new IrcClientService(
-    host: "Envidia.local",       // IRC server hostname (your machine or a LAN DNS name)
-    port: 6667,                  // Standard plaintext IRC port
-    nick: "LoboForge",           // Your nickname on the server
-    user: "mIRCUser",            // Username passed in the USER command
-    dispatcher: Common.Dispatcher // Instance of your IrcCommandDispatcher
+    host: "Envidia.local",
+    port: 6667,
+    nick: "LoboForge",
+    user: "mIRCUser",
+    dispatcher: Common.Dispatcher
 );
-//irc.libera.chat
-//palladium.libera.chat
-//6697
-//// Kick off the connection in the background
-//_ = Task.Run(() => Common.ircClient.ConnectAsync(CancellationToken.None));
-app.Run();
+ConfigService.Load();
+// Start Electron app and create window
+if (HybridSupport.IsElectronActive)
+{
+    Task.Run(async () =>
+    {
+        var window = await Electron.WindowManager.CreateWindowAsync(new BrowserWindowOptions
+        {
+            Width = 1280,
+            Height = 800,
+            Show = true
+        });
+
+        window.OnClosed += () =>
+        {
+            Electron.App.Quit();
+        };
+    });
+}
+
+await app.RunAsync();

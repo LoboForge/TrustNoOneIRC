@@ -2,7 +2,7 @@
     let currentZ = 100;
 
     return {
-        startDrag: function (el, startX, startY) {
+        startDrag: function (el, startX, startY, dotNetHelper) {
             el = el instanceof HTMLElement ? el : el instanceof Element ? el : el instanceof Object ? el : el.getBoundingClientRect();
 
             const rect = el.getBoundingClientRect();
@@ -10,8 +10,15 @@
             const offsetY = startY - rect.top;
 
             function onMouseMove(e) {
-                el.style.left = (e.clientX - offsetX) + 'px';
-                el.style.top = (e.clientY - offsetY) + 'px';
+                const left = e.clientX - offsetX;
+                const top = e.clientY - offsetY;
+
+                el.style.left = left + 'px';
+                el.style.top = top + 'px';
+
+                if (dotNetHelper) {
+                    dotNetHelper.invokeMethodAsync('UpdateWindowPosition', top, left);
+                }
             }
 
             function onMouseUp() {
@@ -23,14 +30,21 @@
             document.addEventListener('mouseup', onMouseUp);
         },
 
-        startResize: function (el, startX, startY) {
+        startResize: function (el, startX, startY, dotNetHelper) {
             const rect = el.getBoundingClientRect();
             const startWidth = rect.width;
             const startHeight = rect.height;
 
             function onMouseMove(e) {
-                el.style.width = (startWidth + (e.clientX - startX)) + 'px';
-                el.style.height = (startHeight + (e.clientY - startY)) + 'px';
+                const newWidth = startWidth + (e.clientX - startX);
+                const newHeight = startHeight + (e.clientY - startY);
+
+                el.style.width = newWidth + 'px';
+                el.style.height = newHeight + 'px';
+
+                if (dotNetHelper) {
+                    dotNetHelper.invokeMethodAsync('UpdateWindowSize', newWidth, newHeight);
+                }
             }
 
             function onMouseUp() {

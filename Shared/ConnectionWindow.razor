@@ -7,9 +7,9 @@
 
     <div class="mb-3 d-flex align-items-center gap-3">
         <select class="form-select w-auto" @bind="SelectedIndex">
-            @for (int i = 0; i < Config.Servers.Count; i++)
+            @for (int i = 0; i < Common.Config.Servers.Count; i++)
             {
-                <option value="@i">@Config.Servers[i].Name</option>
+                <option value="@i">@Common.Config.Servers[i].Name</option>
             }
         </select>
 
@@ -96,6 +96,27 @@
                 </div>
             }
         }
+        @if (SelectedServer != null)
+        {
+            <div class="mt-4">
+                <label class="form-label">Auto-Join Channels</label>
+
+                <ul class="list-group mb-2">
+                    @foreach (var channel in SelectedServer.AutoJoinChannels ??= new())
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            @channel
+                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveChannel(channel)">Remove</button>
+                        </li>
+                    }
+                </ul>
+
+                <div class="input-group">
+                    <input class="form-control" placeholder="#channel" @bind="NewChannelName" />
+                    <button class="btn btn-outline-primary" @onclick="AddChannel">Add</button>
+                </div>
+            </div>
+        }
 
         <div class="mt-4 d-flex gap-3">
             <button class="btn btn-primary" @onclick="Connect">🔌 Connect</button>
@@ -105,42 +126,46 @@
 </div>
 
 @code {
-    private AppConfig Config = new();
     private int SelectedIndex = 0;
     private bool disposedValue;
-
+    private string NewChannelName = "";
     private IrcServerProfile? SelectedServer =>
-    (SelectedIndex >= 0 && SelectedIndex < Config.Servers.Count)
-        ? Config.Servers[SelectedIndex]
+    (SelectedIndex >= 0 && SelectedIndex < Common.Config.Servers.Count)
+        ? Common.Config.Servers[SelectedIndex]
         : null;
 
-    private bool CanDelete => Config.Servers.Count > 1;
+    private bool CanDelete => Common.Config.Servers.Count > 1;
 
     protected override void OnInitialized()
     {
-        Config = ConfigService.Load();
+        if (Common.Config == null)
+        {
+            ConfigService.Load();
+            StateHasChanged();
+        }
+        EventBus.Subscribe<ConnectionCompletedEvent>(OnIrcConnected);
     }
 
     private void AddNewServer()
     {
-        Config.Servers.Add(new IrcServerProfile { Name = $"New Server {Config.Servers.Count + 1}" });
-        SelectedIndex = Config.Servers.Count - 1;
-        ConfigService.Save(Config);
+        Common.Config.Servers.Add(new IrcServerProfile { Name = $"New Server {Common.Config.Servers.Count + 1}" });
+        SelectedIndex = Common.Config.Servers.Count - 1;
+        ConfigService.Save();
     }
 
     private void DeleteCurrentServer()
     {
         if (CanDelete)
         {
-            Config.Servers.RemoveAt(SelectedIndex);
+            Common.Config.Servers.RemoveAt(SelectedIndex);
             SelectedIndex = Math.Max(0, SelectedIndex - 1);
-            ConfigService.Save(Config);
+            ConfigService.Save();
         }
     }
 
     private void SaveProfile()
     {
-        ConfigService.Save(Config);
+        ConfigService.Save();
     }
 
     private void Connect()
@@ -168,7 +193,7 @@
             options: options
         );
 
-        ConfigService.Save(Config);
+        ConfigService.Save();
         Common.ircClient.StartService();
     }
 
@@ -187,9 +212,51 @@
         }
     }
 
+
+    private void AddChannel()
+    {
+        if (string.IsNullOrWhiteSpace(NewChannelName)) return;
+
+        NewChannelName = NewChannelName.Trim();
+
+        if (!NewChannelName.StartsWith("#"))
+            NewChannelName = "#" + NewChannelName;
+
+        if (!SelectedServer.AutoJoinChannels.Contains(NewChannelName, StringComparer.OrdinalIgnoreCase))
+        {
+            SelectedServer.AutoJoinChannels.Add(NewChannelName);
+            NewChannelName = "";
+            ConfigService.Save();
+        }
+    }
+
+    private void RemoveChannel(string channel)
+    {
+        SelectedServer.AutoJoinChannels.Remove(channel);
+        ConfigService.Save();
+    }
+    private async void OnIrcConnected(ConnectionCompletedEvent evt)
+    {
+        var profile = SelectedServer;
+        if (profile == null || Common.ircClient == null)
+            return;
+
+        Console.WriteLine($"[UI] IRC Connected. Joining AutoJoinChannels...");
+
+        foreach (var channel in profile.AutoJoinChannels ?? Enumerable.Empty<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(channel))
+            {
+                await Common.ircClient.JoinChannelAsync(channel);
+            }
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
     public void Dispose()
     {
-        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        EventBus.Unsubscribe<ConnectionCompletedEvent>(OnIrcConnected);
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }

@@ -1,4 +1,5 @@
-﻿using TNO.mIRC.Models;
+﻿using System.Net;
+using TNO.mIRC.Models;
 
 public class AppConfig
 {
@@ -6,4 +7,5 @@ public class AppConfig
     public List<IrcServerProfile> Servers { get; set; } = new() {
         new IrcServerProfile { Name = "Default", Host = "irc.libera.chat", Port = 6697 }
     };
+    public List<AutoReply> AutoReplies { get; set; } = new();
 }

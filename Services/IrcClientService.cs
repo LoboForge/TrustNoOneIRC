@@ -17,6 +17,8 @@ public class IrcClientService
     public List<IrcChannel> AvailableChannels { get; set; } = new();
     public List<IrcChannel> DirectMessages { get; set; } = new();
 
+
+
     public string Host;
     public int Port;
     public string Nick;
@@ -57,6 +59,7 @@ public class IrcClientService
         _saslPassword = options.SaslPassword;
         _clientCertPath = options?.ClientCertPath;
         _clientCertPassword = options?.ClientCertPassword;
+
     }
 
     public void StartService()
@@ -199,6 +202,10 @@ public class IrcClientService
             {
                 Console.WriteLine("[IRC] Registration complete.");
                 registrationComplete = true;
+
+                var welcomeMessage = message.Trailing ?? "Welcome";
+                EventBus.Publish(new ConnectionCompletedEvent(welcomeMessage));
+                EventBus.Publish(new WelcomeEvent { Message = welcomeMessage });
             }
 
             if (message.Command.Equals("PING", StringComparison.OrdinalIgnoreCase))

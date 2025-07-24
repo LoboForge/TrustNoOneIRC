@@ -1,0 +1,132 @@
+﻿@using TNO.mIRC.Models
+@using TNO.mIRC.Services
+
+<div class="chat-window-content d-flex flex-column">
+    <div class="flex-grow-1 d-flex overflow-hidden">
+        <div class="chat-messages flex-grow-1 overflow-auto">
+            <h3>Auto Replies</h3>
+            <ul>
+                @foreach (var phrase in Common.Config.AutoReplies)
+                {
+                    <li style="margin-bottom: 1rem;">
+                        <div><b>Trigger:</b> <code>@phrase.Trigger</code></div>
+                        <div><b>Reply:</b> <code>@phrase.Reply</code></div>
+                        <div>
+                            <label>
+                                <input type="checkbox" @bind="phrase.Enabled" />
+                                Enabled
+                            </label>
+                            <label>
+                                <input type="checkbox" @bind="phrase.PrivateMessages" />
+                                PrivateMessages
+                            </label>
+                            <label>
+                                <input type="checkbox" @bind="phrase.ChannelMessages" />
+                                ChannelMessages (ALL)
+                            </label>
+                        </div>
+                        <div>
+                            <label>Min Delay (s):</label>
+                            <input type="number" step="0.1" min="0" style="width:60px" @bind="phrase.MinDelay" />
+                            &nbsp;
+                            <label>Max Delay (s):</label>
+                            <input type="number" step="0.1" min="0" style="width:60px" @bind="phrase.MaxDelay" />
+                        </div>
+                        <button @onclick="() => RemovePhrase(phrase)">❌</button>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <div class="chat-input mt-1 d-flex flex-column gap-2">
+        <input type="text" placeholder="Trigger phrase (e.g. wolf)" @bind-value="NewTrigger" />
+        <input type="text" placeholder="Reply message (e.g. ahoooo!)" @bind-value="NewReply" />
+        <button @onclick="AddPhrase">Add Auto Reply</button>
+    </div>
+</div>
+
+@code {
+    private Action<PrivateMessageReceivedEvent>? _privateHandler;
+    private Action<ChannelMessageReceivedEvent>? _channelHandler;
+
+    private string NewTrigger = string.Empty;
+    private string NewReply = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        _privateHandler = HandlePrivateMessage;
+        _channelHandler = HandleChannelMessage;
+
+        EventBus.Unsubscribe<PrivateMessageReceivedEvent>(_privateHandler);
+        EventBus.Unsubscribe<ChannelMessageReceivedEvent>(_channelHandler);
+
+        EventBus.Subscribe<PrivateMessageReceivedEvent>(_privateHandler);
+        EventBus.Subscribe<ChannelMessageReceivedEvent>(_channelHandler);
+    }
+
+    private void AddPhrase()
+    {
+        if (!string.IsNullOrWhiteSpace(NewTrigger) && !string.IsNullOrWhiteSpace(NewReply))
+        {
+            Common.Config.AutoReplies.Add(new AutoReply
+            {
+                Trigger = NewTrigger.Trim(),
+                Reply = NewReply.Trim(),
+                Enabled = true,
+                MinDelay = 0.5,
+                MaxDelay = 1.5
+            });
+
+            ConfigService.Save(); // ← Add this
+
+            NewTrigger = string.Empty;
+            NewReply = string.Empty;
+        }
+    }
+
+    private void RemovePhrase(AutoReply phrase)
+    {
+        Common.Config.AutoReplies.Remove(phrase);
+        ConfigService.Save(); // ← Add this
+    }
+    public async void HandlePrivateMessage(PrivateMessageReceivedEvent evt)
+    {
+        foreach (var pair in Common.Config.AutoReplies)
+        {
+            if (!pair.Enabled || !pair.PrivateMessages) continue;
+
+            if (evt.Message.Content.Contains(pair.Trigger, StringComparison.OrdinalIgnoreCase))
+            {
+                double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
+                await Task.Delay(TimeSpan.FromSeconds(delay));
+                Common.ircClient.SendMessageAsync(evt.Sender.Nickname, pair.Reply);
+                break;
+            }
+        }
+
+    }
+    public async void HandleChannelMessage(ChannelMessageReceivedEvent evt)
+    {
+        foreach (var pair in Common.Config.AutoReplies)
+        {
+            if (!pair.Enabled || !pair.ChannelMessages) continue;
+
+            if (evt.Content.Contains(pair.Trigger, StringComparison.OrdinalIgnoreCase))
+            {
+                double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
+                await Task.Delay(TimeSpan.FromSeconds(delay));
+                Common.ircClient.SendMessageAsync(evt.Target, pair.Reply);
+                break;
+            }
+        }
+
+    }
+    public void Dispose()
+    {
+        if (_privateHandler != null)
+            EventBus.Unsubscribe<PrivateMessageReceivedEvent>(_privateHandler);
+        if (_channelHandler != null)
+            EventBus.Unsubscribe<ChannelMessageReceivedEvent>(_channelHandler);
+    }
+}

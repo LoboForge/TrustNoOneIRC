@@ -1,21 +1,47 @@
-﻿@inherits LayoutComponentBase
-@inject IJSRuntime JSRuntime
+﻿@using TNO.mIRC.Models
+@inherits LayoutComponentBase
+@inject IJSRuntime JS
 
-<div @ref="windowRef" class="hacker-window" @onmousedown="@(() => BringToFront())">
+<div @ref="windowRef" class="hacker-window" @onmousedown="@(() => BringToFront())" style="position:absolute; top:@TopPx; left:@LeftPx; width:@WidthPx; height:@HeightPx;">
     <div class="title-bar" @onmousedown="StartDrag">
-        <span>@Title</span>
-        <button class="close-btn" @onclick="OnClose">✕</button>
+        <span class="title-text">@Title</span>
+
+        <div class="window-controls">
+            @if (!window.IsMinimized)
+            {
+                <button class="close-btn" @onclick="OnMinimize">−</button>
+            }
+            <button class="close-btn" @onclick="OnRestore">▢</button>
+            <button class="close-btn" @onclick="OnClose">✕</button>
+        </div>
     </div>
-    <div class="content">
-        @ChildContent
-    </div>
-    <div class="resizer" @onmousedown="StartResize"></div>
+
+    @if (!window.IsMinimized)
+    {
+        <div class="content">
+            @ChildContent
+        </div>
+        <div class="resizer" @onmousedown="StartResize"></div>
+    }
 </div>
 
 @code {
+    [Parameter] public Window window { get; set; }
     [Parameter] public string Title { get; set; } = "Surveillance Feed";
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnCloseClicked { get; set; }
+    [Parameter] public EventCallback<(int Top, int Left)> OnPositionChanged { get; set; }
+    [Parameter] public int Top { get; set; }
+    [Parameter] public int Left { get; set; }
+    [Parameter] public int Width { get; set; }
+    [Parameter] public int Height { get; set; }
+
+    private DotNetObjectReference<HackerWindow>? _ref;
+
+    private string TopPx => $"{Top}px";
+    private string LeftPx => $"{Left}px";
+    private string WidthPx => $"{Width}px";
+    private string HeightPx => $"{Height}px";
 
     private ElementReference windowRef;
 
@@ -24,12 +50,45 @@
         await OnCloseClicked.InvokeAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _ref = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, _ref);
+        }
+    }
+
+    [JSInvokable]
+    public async Task UpdateWindowPosition(int top, int left)
+    {
+        if (OnPositionChanged.HasDelegate)
+            await OnPositionChanged.InvokeAsync((top, left));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _ref?.Dispose();
+    }
     private async void StartDrag(MouseEventArgs e) =>
-        await JSRuntime.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, e.ClientX, e.ClientY);
+        await JS.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, e.ClientX, e.ClientY);
 
     private async void StartResize(MouseEventArgs e) =>
-        await JSRuntime.InvokeVoidAsync("hackerWindowInterop.startResize", windowRef, e.ClientX, e.ClientY);
+        await JS.InvokeVoidAsync("hackerWindowInterop.startResize", windowRef, e.ClientX, e.ClientY);
 
     private async void BringToFront() =>
-        await JSRuntime.InvokeVoidAsync("hackerWindowInterop.bringToFront", windowRef);
+        await JS.InvokeVoidAsync("hackerWindowInterop.bringToFront", windowRef);
+
+    private void OnMinimize(MouseEventArgs args)
+    {
+        window.IsMinimized = true;
+        Height = 40;
+        Width = 300;
+    }
+    private void OnRestore(MouseEventArgs args)
+    {
+        window.IsMinimized = false;
+        Height = 500;
+        Width = 500;
+    }
 }

@@ -5,21 +5,33 @@
     @foreach (var window in OpenWindows)
     {
         <HackerWindow Title="@window.Title"
-                      OnCloseClicked='@(() => HandleWindowClose(window))'>
+                      Window="@window"
+                      Top="@window.Top"
+                      Left="@window.Left"
+                      Width="@window.Width"
+                      Height="@window.Height"
+                      OnCloseClicked='@(() => HandleWindowClose(window))'
+                      OnPositionChanged="pos => UpdateWindowPosition(window, pos)">
             @window.ChildContent
         </HackerWindow>
     }
 
 
     <div class="desktop-dock">
+        <div class="dock-icon" title="Tile All" @onclick="TileAllWindows">
+            <span class="oi oi-grid-three-up"></span>
+        </div>
         <div class="dock-icon" title="Connection" @onclick="ToggleConnectionWindow">
             <span class="oi oi-cloud"></span>
         </div>
         <div class="dock-icon" title="Join Channel" @onclick="JoinChannelWindow">
             <span class="oi oi-plus"></span>
         </div>
-        <div class="dock-icon" title="IRC Log" @onclick="ToggleCommandWindow">
-            <span class="oi oi-terminal"></span>
+        <div class="dock-icon" title="Reply Bot" @onclick="ToggleReplyBotWindow">
+            <span class="oi oi-reload"></span>
+        </div>
+        <div class="dock-icon" title="Raw Commands" @onclick="ToggleCommandWindow">
+            <span class="oi oi-code"></span>
         </div>
         <div class="dock-icon" title="IRC Log" @onclick="ToggleLogWindow">
             <span class="oi oi-terminal"></span>
@@ -63,6 +75,39 @@
             convo.Messages.Add(evt.Message);
         });
     }
+    private void UpdateWindowPosition(Window window, (int Top, int Left) pos)
+    {
+        window.Top = pos.Top;
+        window.Left = pos.Left;
+    }
+    private void TileAllWindows()
+    {
+        int total = OpenWindows.Count;
+        if (total == 0) return;
+
+        int columns = (int)Math.Ceiling(Math.Sqrt(total));
+        int rows = (int)Math.Ceiling((double)total / columns);
+
+        int desktopWidth = 1280;  // TODO: replace with JSInterop screen width later
+        int desktopHeight = 720;
+
+        int tileWidth = desktopWidth / columns;
+        int tileHeight = desktopHeight / rows;
+
+        for (int i = 0; i < total; i++)
+        {
+            int row = i / columns;
+            int col = i % columns;
+
+            OpenWindows[i].Top = row * tileHeight;
+            OpenWindows[i].Left = col * tileWidth;
+            OpenWindows[i].Width = tileWidth;
+            OpenWindows[i].Height = tileHeight;
+        }
+
+        StateHasChanged();
+    }
+
     private void HandlePmRequest(RequestPrivateMessageEvent evt)
     {
         var user = evt.Target;
@@ -200,6 +245,27 @@
                 ChildContent = builder =>
                 {
                     builder.OpenComponent(0, typeof(RawCommandWindow));
+                    builder.CloseComponent();
+                }
+            };
+
+
+            OpenWindows.Add(window);
+        }
+    }
+    private void ToggleReplyBotWindow(MouseEventArgs args)
+    {
+        var commandwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.AutoReply);
+        if (commandwindow != null) OpenWindows.Remove(commandwindow);
+        else
+        {
+            var window = new Window
+            {
+                Title = "Commands",
+                Type = WindowType.AutoReply,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(AutoReplyWindow));
                     builder.CloseComponent();
                 }
             };

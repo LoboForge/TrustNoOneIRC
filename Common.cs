@@ -5,6 +5,7 @@ namespace TNO.mIRC
 {
     public static class Common
     {
+        public static AppConfig Config { get; set; }
         public static IrcClientService ircClient;
         public static IrcCommandDispatcher Dispatcher = new IrcCommandDispatcher(new List<IIrcCommandHandler>
         {

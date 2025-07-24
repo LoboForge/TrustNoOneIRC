@@ -35,13 +35,31 @@ else
 
     private string CurrentMessage = "";
     private ElementReference MessagesDiv;
-
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        EventBus.Subscribe<PrivateMessageReceivedEvent>(HandleNewMessage);
+    }
     private void HandleKey(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
             SendMessage();
     }
+    private async void HandleNewMessage(PrivateMessageReceivedEvent evt)
+    {
 
+        await InvokeAsync(async () =>
+        {
+            StateHasChanged();
+            await Task.Delay(50);
+            await ScrollToBottom();
+        });
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
+    }
     private void SendMessage()
     {
         if (!string.IsNullOrWhiteSpace(CurrentMessage))
