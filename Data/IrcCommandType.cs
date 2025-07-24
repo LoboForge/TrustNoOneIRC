@@ -1,4 +1,4 @@
-﻿namespace TNO.mIRC.Data
+﻿namespace LoboForge.TNOIRC.Data
 {
     public enum IrcCommandType
     {

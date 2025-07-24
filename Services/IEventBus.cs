@@ -1,5 +1,5 @@
 ﻿using System.Collections.Concurrent;
-using TNO.mIRC.Services;
+using LoboForge.TNOIRC.Services;
 
 public static class EventBus
 {

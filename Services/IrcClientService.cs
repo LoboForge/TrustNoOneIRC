@@ -1,4 +1,4 @@
-﻿namespace TNO.mIRC.Services;
+﻿namespace LoboForge.TNOIRC.Services;
 
 using System.Diagnostics;
 using System.Net.Security;
@@ -6,8 +6,8 @@ using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using TNO.mIRC.Commands;
-using TNO.mIRC.Models;
+using LoboForge.TNOIRC.Commands;
+using LoboForge.TNOIRC.Models;
 
 public class IrcClientService
 {

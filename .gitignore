@@ -52,6 +52,7 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
-/.vs/TNO.mIRC
+/.vs/LoboForge.TNOIRC
 /.vs/ProjectEvaluation
 /node_modules
+/.vs/TNO.mIRC

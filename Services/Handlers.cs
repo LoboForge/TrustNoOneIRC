@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Routing;
 using System.Collections.Generic;
-using TNO.mIRC.Models;
-using TNO.mIRC.Services;
+using LoboForge.TNOIRC.Models;
+using LoboForge.TNOIRC.Services;
 
-namespace TNO.mIRC.Commands
+namespace LoboForge.TNOIRC.Commands
 {
     public class PrivMsgHandler : IIrcCommandHandler
     {

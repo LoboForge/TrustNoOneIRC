@@ -1,4 +1,4 @@
-﻿namespace TNO.mIRC.Commands
+﻿namespace LoboForge.TNOIRC.Commands
 {
     public static class IrcCommands
     {

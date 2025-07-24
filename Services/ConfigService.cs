@@ -1,11 +1,11 @@
 ﻿using System.Text.Json;
-using TNO.mIRC;
+using LoboForge.TNOIRC;
 
 public static class ConfigService
 {
     public static string ConfigPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "TNO.mIRC", "config.json");
+        "LoboForge.TNOIRC", "config.json");
 
     public static void Load()
     {

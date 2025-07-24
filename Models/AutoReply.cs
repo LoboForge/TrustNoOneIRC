@@ -1,4 +1,4 @@
-﻿namespace TNO.mIRC.Models
+﻿namespace LoboForge.TNOIRC.Models
 {
     public class AutoReply
     {

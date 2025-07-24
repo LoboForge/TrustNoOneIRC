@@ -1,4 +1,4 @@
-﻿namespace TNO.mIRC.Models;
+﻿namespace LoboForge.TNOIRC.Models;
 
 /// <summary>
 /// Represents an IRC user with nickname, username, and hostname.

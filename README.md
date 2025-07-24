@@ -22,7 +22,7 @@ This project was created to **bring modern UI and security practices** to the IR
 ## 📸 Screenshots
 
 > _"You're in a dark room... connected to an IRC server... over Tor... with cert-based auth... this is not your grandpa’s IRC client."_  
-![Demo](https://www.loboforge.com/TNO.IRC.png)
+![Demo](https://www.loboforge.com/LoboForge.TNOIRC.png)
 
 ---
 

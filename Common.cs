@@ -1,7 +1,7 @@
-﻿using TNO.mIRC.Commands;
-using TNO.mIRC.Services;
+﻿using LoboForge.TNOIRC.Commands;
+using LoboForge.TNOIRC.Services;
 
-namespace TNO.mIRC
+namespace LoboForge.TNOIRC
 {
     public static class Common
     {

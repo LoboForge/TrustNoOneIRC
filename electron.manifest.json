@@ -1,15 +1,15 @@
 {
-  "executable": "TNO.mIRC",
+  "executable": "LoboForge.TNOIRC",
   "splashscreen": {
     "imageFile": ""
   },
-  "name": "TNO.mIRC",
+  "name": "LoboForge.TNOIRC",
   "author": "",
   "singleInstance": false,
   "environment": "Development",
   "build": {
-    "appId": "com.TNO.mIRC.app",
-    "productName": "TNO.mIRC",
+    "appId": "com.LoboForge.TNOIRC.app",
+    "productName": "LoboForge.TNOIRC",
     "copyright": "Copyright © 2020",
     "buildVersion": "1.0.0",
     "compression": "maximum",

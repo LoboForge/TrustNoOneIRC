@@ -1,11 +1,11 @@
-﻿namespace TNO.mIRC.Services;
+﻿namespace LoboForge.TNOIRC.Services;
 
 using System.Diagnostics;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Text;
-using TNO.mIRC.Commands;
-using TNO.mIRC.Models;
+using LoboForge.TNOIRC.Commands;
+using LoboForge.TNOIRC.Models;
 
 public static class TorSocks5Helper
 {

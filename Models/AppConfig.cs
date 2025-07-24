@@ -1,5 +1,5 @@
 ﻿using System.Net;
-using TNO.mIRC.Models;
+using LoboForge.TNOIRC.Models;
 
 public class AppConfig
 {

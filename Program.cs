@@ -3,9 +3,9 @@ using ElectronNET.API.Entities;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Http.Connections;
-using TNO.mIRC;
-using TNO.mIRC.Data;
-using TNO.mIRC.Services;
+using LoboForge.TNOIRC;
+using LoboForge.TNOIRC.Data;
+using LoboForge.TNOIRC.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

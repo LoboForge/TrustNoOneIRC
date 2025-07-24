@@ -15,7 +15,7 @@
       "workingDirectory": "."
     },
 
-    "TNO.mIRC": {
+    "LoboForge.TNOIRC": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,

@@ -1,6 +1,6 @@
-﻿using TNO.mIRC.Models;
+﻿using LoboForge.TNOIRC.Models;
 
-namespace TNO.mIRC.Services
+namespace LoboForge.TNOIRC.Services
 {
     public interface IIrcCommandHandler
     {

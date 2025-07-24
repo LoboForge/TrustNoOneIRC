@@ -1,6 +1,6 @@
 ﻿
 
-using TNO.mIRC.Models;
+using LoboForge.TNOIRC.Models;
 
 /// <summary>
 /// Marker interface for all IRC event types.
