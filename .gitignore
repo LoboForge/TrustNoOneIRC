@@ -8,3 +8,6 @@
 /BotCore/obj
 /LoboForge.TNOIRC.Shared/bin/Debug/net8.0
 /LoboForge.TNOIRC.Shared/obj
+/BotCore/bin/Release/net8.0
+/LoboForge.TNOIRC.Shared/bin/Release/net8.0
+/obj/desktop/windows/bin
