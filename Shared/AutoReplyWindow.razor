@@ -104,7 +104,7 @@ IRC.Services
             {
                 double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
                 await Task.Delay(TimeSpan.FromSeconds(delay));
-                Common.ircClient.SendMessageAsync(evt.Sender.Nickname, pair.Reply);
+                Common.ircClient.SendMessageAsync(evt.Sender.Nick, pair.Reply);
                 break;
             }
         }

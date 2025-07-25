@@ -26,6 +26,9 @@
         <div class="dock-icon" title="Connection" @onclick="ToggleConnectionWindow">
             <span class="oi oi-cloud"></span>
         </div>
+        <div class="dock-icon" title="Bot Manager" @onclick="ToggleBotManagerWindow">
+            🤖
+        </div>
         <div class="dock-icon" title="Join Channel" @onclick="JoinChannelWindow">
             <span class="oi oi-plus"></span>
         </div>
@@ -65,7 +68,7 @@
         {
             var user = evt.Sender;
 
-            var convo = PMs.FirstOrDefault(p => p.User.Nickname == user.Nickname);
+            var convo = PMs.FirstOrDefault(p => p.User.Nick == user.Nick);
             if (convo == null)
             {
                 convo = new PrivateConversation(user);
@@ -114,7 +117,7 @@
     {
         var user = evt.Target;
 
-        var convo = PMs.FirstOrDefault(p => p.User.Nickname == user.Nickname);
+        var convo = PMs.FirstOrDefault(p => p.User.Nick == user.Nick);
         if (convo == null)
         {
             convo = new PrivateConversation(user);
@@ -142,7 +145,7 @@
 
     private void OpenPrivateMessageWindow(PrivateConversation convo)
     {
-        if (OpenWindows.Any(w => w.Title == convo.User.Nickname)) return;
+        if (OpenWindows.Any(w => w.Title == convo.User.Nick)) return;
 
         var fragment = new RenderFragment(builder =>
         {
@@ -153,7 +156,7 @@
 
         OpenWindows.Add(new Window
         {
-            Title = convo.User.Nickname,
+            Title = convo.User.Nick,
             Type = WindowType.PM,
             ChildContent = fragment
         });
@@ -309,6 +312,29 @@
                 ChildContent = builder =>
                 {
                     builder.OpenComponent(0, typeof(ChannelBrowser));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+        }
+    }
+    private void ToggleBotManagerWindow(MouseEventArgs args)
+    {
+        var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.BotManager);
+        if (existing != null)
+        {
+            OpenWindows.Remove(existing);
+        }
+        else
+        {
+            var window = new Window
+            {
+                Title = "Bot Manager",
+                Type = WindowType.BotManager,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(BotManager));
                     builder.CloseComponent();
                 }
             };

@@ -5,13 +5,13 @@
 /// </summary>
 public class IrcUser
 {
-    public string Nickname { get; set; }
+    public string Nick { get; set; }
     public string Username { get; set; }
     public string Hostname { get; set; }
 
     public IrcUser(string nickname, string username = "", string hostname = "")
     {
-        Nickname = nickname;
+        Nick = nickname;
         Username = username;
         Hostname = hostname;
     }
@@ -41,5 +41,5 @@ public class IrcUser
     }
 
 
-    public override string ToString() => $"{Nickname}!{Username}@{Hostname}";
+    public override string ToString() => $"{Nick}!{Username}@{Hostname}";
 }

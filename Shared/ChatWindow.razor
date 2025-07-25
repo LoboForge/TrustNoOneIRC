@@ -19,9 +19,9 @@ else
                 @if (ShowUserList)
                 {
                     <div class="user-list border-end pe-2 me-2" style="width: 160px; overflow-y: auto;">
-                        @foreach (var user in Channel.Users.OrderBy(u => u.Nickname))
+                        @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
                         {
-                            <div class="user-entry" @onclick="() => StartPm(user)">@user.Nickname</div>
+                            <div class="user-entry" @onclick="() => StartPm(user)">@user.Nick</div>
                         }
                     </div>
                 }
@@ -33,7 +33,7 @@ else
                         {
                             <div class="chat-message">
                                 <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                                <span class="user">@msg.Sender.Nickname:</span>
+                                <span class="user">@msg.Sender.Nick:</span>
                                 <span class="text">@msg.Content</span>
                             </div>
                         }
@@ -41,7 +41,7 @@ else
                         {
                             <div class="chat-message">
                                 <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                                <span class="user" style="font-weight:bold;">** @msg.Sender.Nickname @msg.Content **</span>
+                                <span class="user" style="font-weight:bold;">** @msg.Sender.Nick @msg.Content **</span>
                             </div>
                         }
                     }

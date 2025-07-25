@@ -11,8 +11,16 @@ public static class EventBus
         {
             foreach (var handler in delegates.OfType<Action<T>>())
             {
-                handler(@event);
+                try
+                {
+                    handler(@event);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[EventBus Error] {ex.Message}");
+                }
             }
+
         }
     }
 

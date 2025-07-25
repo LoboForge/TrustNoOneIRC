@@ -50,10 +50,10 @@ namespace LoboForge.TNOIRC.Commands
             {
                 // Private message
                 var existing = Common.ircClient.DirectMessages
-                    .FirstOrDefault(u => string.Equals(u.Name, sender.Nickname, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(u => string.Equals(u.Name, sender.Nick, StringComparison.OrdinalIgnoreCase));
 
                 if (existing == null)
-                    Common.ircClient.DirectMessages.Add(new IrcChannel { Name = sender.Nickname });
+                    Common.ircClient.DirectMessages.Add(new IrcChannel { Name = sender.Nick });
 
                 EventBus.Publish(new PrivateMessageReceivedEvent(sender, chatMessage, isAction));
             }
@@ -80,7 +80,7 @@ namespace LoboForge.TNOIRC.Commands
 
             var user = IrcUser.FromPrefix(message.Prefix);
 
-            if (string.Equals(user.Nickname, Common.ircClient.Nick, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(user.Nick, Common.ircClient.Nick, StringComparison.OrdinalIgnoreCase))
             {
                 var existing = Common.ircClient.JoinedChannels
                     .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
@@ -148,7 +148,7 @@ namespace LoboForge.TNOIRC.Commands
             foreach (var rawNick in nickList)
             {
                 var cleanNick = rawNick.TrimStart('@', '+', '~', '&', '%');
-                if (!channel.Users.Any(u => u.Nickname.Equals(cleanNick, StringComparison.OrdinalIgnoreCase)))
+                if (!channel.Users.Any(u => u.Nick.Equals(cleanNick, StringComparison.OrdinalIgnoreCase)))
                 {
                     channel.Users.Add(new IrcUser(cleanNick));
                 }

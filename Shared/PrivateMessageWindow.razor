@@ -15,7 +15,7 @@ else
             {
                 <div class="pm-message">
                     <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                    <span class="user">@msg.Sender.Nickname:</span>
+                    <span class="user">@msg.Sender.Nick:</span>
                     <span class="text">@msg.Content</span>
                 </div>
             }
@@ -66,8 +66,8 @@ else
     {
         if (!string.IsNullOrWhiteSpace(CurrentMessage))
         {
-            Common.ircClient.SendMessageAsync(Conversation.User.Nickname, CurrentMessage);
-            Conversation.Messages.Add(new ChatMessage(DateTime.Now, new IrcUser(Common.ircClient.Nick), Conversation.User.Nickname, CurrentMessage, false));
+            Common.ircClient.SendMessageAsync(Conversation.User.Nick, CurrentMessage);
+            Conversation.Messages.Add(new ChatMessage(DateTime.Now, new IrcUser(Common.ircClient.Nick), Conversation.User.Nick, CurrentMessage, false));
             CurrentMessage = "";
         }
     }
