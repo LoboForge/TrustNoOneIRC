@@ -1,103 +1,131 @@
 # 🔐 TNO IRC Client
 
-Welcome to the **TNO IRC Client** — a fully custom-built, hacker-themed, secure-by-default IRC client built with **Blazor** and **.NET**.  
-This project was created to **bring modern UI and security practices** to the IRC world while remaining lean, extensible, and blazing fast.
+Welcome to the **TNO IRC Client** — a fully custom-built, hacker-themed, secure-by-default IRC client built on **Blazor** and **Electron.NET**.  
+This project brings a modern UI, hardened opsec, and the classic power of IRC to the desktop — **no browser required**.
 
 ---
 
 ## ✨ Features
 
-- 🧠 **Full Blazor Frontend**: Interactive desktop-like UI rendered in the browser with real-time updates.
-- 🔒 **TLS & Tor Support**: Seamless integration with **SSL/TLS** and **Tor** (via SOCKS5) for anonymous, encrypted connections.
-- 🔐 **Client Certificate Authentication**: SASL EXTERNAL support using pinned client certificates.
-- 🧾 **NickServ Registration & WHOIS Tools**: Register, verify, and manage identities with complete IRC protocol transparency.
-- 📜 **Raw Command Mode**: Send and inspect raw IRC commands and responses for power users and debugging.
-- 🧰 **Modular Command Dispatcher**: Easily extend the protocol handler with your own custom commands.
-- 🪟 **Window Manager**: Tabbed windows for each channel, private message, or system console.
-- 💻 **Cross-platform**: Runs on any platform supported by .NET and WebAssembly.
-- 🧙‍♂️ **Hacker Theme**: Dark, matrix-style design — because IRC should look badass.
+- 🧠 **Blazor + Electron.NET**: Runs as a standalone desktop app — cross-platform and offline-capable.
+- 🔒 **Tor Support**: Automatically connects over Tor using built-in SOCKS5 proxy support.
+- 🪪 **Client Certificate Auth (SASL EXTERNAL)**: Authenticate using pinned client certificates.
+- 🧭 **NickServ & WHOIS Tools**: Inspect identities, verify fingerprints, and automate registration.
+- ⚙️ **Raw IRC Mode**: View and inject raw protocol messages like a pro.
+- 🧰 **Plugin-Ready Command Dispatcher**: Extend with your own logic using dependency-free bots.
+- 🪟 **Multi-Window Tabbed UI**: Each channel, PM, or server console lives in its own tab.
+- 🧙‍♂️ **Stylized Hacker Theme**: Matrix-green, smoked glass, and bold lines.  
+- 💻 **Cross-Platform**: Fully packaged builds for **Windows** and **Linux (AppImage + Snap)**.
 
 ---
 
-## 📸 Screenshots
+## 📸 Screenshot
 
-> _"You're in a dark room... connected to an IRC server... over Tor... with cert-based auth... this is not your grandpa’s IRC client."_  
-![Demo](https://www.loboforge.com/LoboForge.TNOIRC.png)
+![Demo UI](https://www.loboforge.com/TNO.IRC.png)
+
+_"You're in a dark room... connected to an IRC server... over Tor... with cert-based auth... this is not your grandpa’s IRC client."_
 
 ---
 
-## 🚀 Getting Started
+## 🧪 Try It Now
+
+### 🪟 Windows  
+📦 [Download Windows Build](https://www.loboforge.com/Builds/WindowsBuild.zip)
+
+### 🐧 Linux  
+📦 [Download AppImage](https://www.loboforge.com/Builds/TNOIRC.AppImage)  
+📦 [Download Snap Package](https://www.loboforge.com/Builds/TNOIRC.snap)
+
+> AppImage: Most common for Linux users  
+> Snap: Works great on Ubuntu and Snap-enabled distros
+
+---
+
+## 🚀 Development Setup
 
 ### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- (Optional) [Tor Browser](https://www.torproject.org/) or Tor daemon running (SOCKS5 on `127.0.0.1:9150`)
-- Valid IRC client certificate (see below)
+- [Electron.NET CLI](https://github.com/ElectronNET/Electron.NET)  
+  Install via:
+  ```bash
+  dotnet tool install ElectronNET.CLI -g
+  ```
+
+- (Optional) Tor running locally (SOCKS5 at `127.0.0.1:9150`)
+- (Optional) A PFX client certificate if using SASL EXTERNAL
 
 ---
 
-### 🔧 Setup & Run
+### 🔧 Run Locally
 
 ```bash
 git clone https://github.com/yourname/tno-irc-client.git
 cd tno-irc-client
-dotnet run
+electronize start
 ```
 
-Browse to: [https://localhost:5001](https://localhost:5001)
+This will launch the full app in Electron.
 
 ---
 
-### 🔐 Certificate Auth Instructions
+### 📦 Build Desktop App
 
-1. Generate your certificate:
-
+#### Windows:
 ```bash
-openssl req -x509 -newkey rsa:4096 -keyout irc-client.key -out irc-client.crt -days 365 -nodes -subj "/CN=YourNick"
-openssl pkcs12 -export -out irc-client.pfx -inkey irc-client.key -in irc-client.crt
+electronize build /target win
 ```
 
-2. Add your fingerprint to NickServ:
+#### Linux (AppImage + Snap):
+```bash
+electronize build /target linux
+```
 
-Connect without Tor first and send:
+Built files will appear under `bin/Desktop/`.
+
+> You can distribute the `.AppImage` and `.snap` directly. No need to zip them.
+
+---
+
+## 🔐 Certificate Authentication (SASL EXTERNAL)
+
+```bash
+openssl req -x509 -newkey rsa:4096 -keyout irc.key -out irc.crt -days 365 -nodes -subj "/CN=YourNick"
+openssl pkcs12 -export -out irc.pfx -inkey irc.key -in irc.crt
+```
+
+Then connect normally, and register your fingerprint with:
 
 ```
 /msg NickServ CERT ADD <your sha512 fingerprint>
 ```
 
-3. Reconnect via Tor using `SASL EXTERNAL` and certificate.
-
 ---
 
-### 🧠 WHOIS Verification
+## 🧠 Tips
 
-Use the built-in `/whois` command to verify your identity and certificate status:
-
-```
-/whois YourNick
-```
-
-Look for `is logged in as` and `has client certificate fingerprint`.
+- Use `/whois YourNick` to verify that your cert was accepted.
+- All bots implement `IBot` and can respond to events or PMs — check the `BotScripts` folder for samples.
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests are welcome! Please submit features or improvements that align with the secure and minimalist philosophy of this project.
+Pull requests are welcome — especially for new bots, modules, or themes.
 
 ---
 
 ## 🧾 License
 
-This project is licensed under the **Attribution-NonCommercial-NoDerivatives 4.0 International (CC BY-NC-ND 4.0)**.  
-You're free to use it, share it, and study it — but always credit the author, don’t resell it, and don’t pass off modified versions as your own.
+Licensed under **CC BY-NC-ND 4.0**  
+Use it, fork it, but don't sell it or claim modified versions as your own.
 
-See: [https://creativecommons.org/licenses/by-nc-nd/4.0/](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+https://creativecommons.org/licenses/by-nc-nd/4.0/
 
 ---
 
 ## 👤 Author
 
 **LoboForge**  
-Crafted with passion and paranoia.
-
+Built with caffeine and paranoia.  
+https://www.loboforge.com
