@@ -52,7 +52,8 @@ if (HybridSupport.IsElectronActive)
         {
             Width = 1280,
             Height = 800,
-            Show = true
+            Show = true,
+            Icon = "/icon.ico"
         });
 
         window.OnClosed += () =>

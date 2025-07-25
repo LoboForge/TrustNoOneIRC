@@ -4,7 +4,9 @@
     "imageFile": ""
   },
   "name": "LoboForge.TNOIRC",
-  "author": "",
+  "author": "dev@loboforge.com",
+  "description": "Trust No One IRC Client by LoboForge.com",
+  "icon": "./assets/icon.ico",
   "singleInstance": false,
   "environment": "Development",
   "build": {

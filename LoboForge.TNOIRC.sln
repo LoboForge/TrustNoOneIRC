@@ -3,7 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36212.18
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoboForge.TNOIRC", "LoboForge.TNOIRC.csproj", "{8CB7C745-766C-4F4F-9409-E001AF5F5FA3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoboForge.TNOIRC", "TNOIRC\LoboForge.TNOIRC.csproj", "{FF5CB975-CF58-0182-779D-5D300AC28679}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotCore", "BotCore\BotCore.csproj", "{D01485AF-C6A0-67F1-0FA8-81FCA52E354F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoboForge.TNOIRC.Shared", "LoboForge.TNOIRC.Shared\LoboForge.TNOIRC.Shared.csproj", "{663958FB-6A8D-49CC-AE3F-21535A97C837}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,10 +15,18 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{8CB7C745-766C-4F4F-9409-E001AF5F5FA3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8CB7C745-766C-4F4F-9409-E001AF5F5FA3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8CB7C745-766C-4F4F-9409-E001AF5F5FA3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8CB7C745-766C-4F4F-9409-E001AF5F5FA3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF5CB975-CF58-0182-779D-5D300AC28679}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF5CB975-CF58-0182-779D-5D300AC28679}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF5CB975-CF58-0182-779D-5D300AC28679}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF5CB975-CF58-0182-779D-5D300AC28679}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D01485AF-C6A0-67F1-0FA8-81FCA52E354F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D01485AF-C6A0-67F1-0FA8-81FCA52E354F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D01485AF-C6A0-67F1-0FA8-81FCA52E354F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D01485AF-C6A0-67F1-0FA8-81FCA52E354F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

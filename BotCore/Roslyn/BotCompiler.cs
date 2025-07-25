@@ -7,6 +7,7 @@ namespace TNO.IRC.BotEngine;
 
 public class BotCompiler
 {
+
     public IEnumerable<Type> Compile(string code, out Assembly? assembly, out List<string> errors)
     {
         errors = new();
@@ -14,10 +15,46 @@ public class BotCompiler
 
         var syntaxTree = CSharpSyntaxTree.ParseText(code);
 
-        var references = AppDomain.CurrentDomain
+        // Collect default runtime references
+        var references = new List<MetadataReference>();
+        var loadedAssemblies = AppDomain.CurrentDomain
             .GetAssemblies()
             .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location))
-            .Select(a => MetadataReference.CreateFromFile(a.Location));
+            .Select(a => a.Location)
+            .Distinct();
+
+        foreach (var path in loadedAssemblies)
+        {
+            try
+            {
+                references.Add(MetadataReference.CreateFromFile(path));
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"[BotCompiler] Failed to load reference: {path} - {ex.Message}");
+            }
+        }
+
+        // Manually include known critical project DLLs
+        string[] manualDlls =
+        {
+            "Bots\\BotCore.dll",
+            "Bots\\LoboForge.TNOIRC.Shared.dll"
+        };
+
+        var baseDir = AppContext.BaseDirectory;
+        foreach (var dll in manualDlls)
+        {
+            var fullPath = Path.Combine(baseDir, dll);
+            if (File.Exists(fullPath))
+            {
+                references.Add(MetadataReference.CreateFromFile(fullPath));
+            }
+            else
+            {
+                errors.Add($"[BotCompiler] Warning: Required DLL not found: {fullPath}");
+            }
+        }
 
         var compilation = CSharpCompilation.Create(
             Path.GetRandomFileName(),
@@ -31,8 +68,9 @@ public class BotCompiler
 
         if (!result.Success)
         {
-            foreach (var diag in result.Diagnostics)
-                errors.Add(diag.ToString());
+            errors.AddRange(result.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Select(d => d.ToString()));
             return Enumerable.Empty<Type>();
         }
 
@@ -49,4 +87,5 @@ public class BotCompiler
 
         return botTypes;
     }
+
 }

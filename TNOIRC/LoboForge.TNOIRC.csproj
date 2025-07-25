@@ -18,6 +18,12 @@
     <Compile Remove="Bots\GoblinTestBot.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Remove="appicon.png" />
+    <None Remove="Bots\BotCore.dll" />
+    <None Remove="Bots\BotCore.pdb" />
+    <None Remove="Bots\LoboForge.TNOIRC.Shared.dll" />
+    <None Remove="Bots\LoboForge.TNOIRC.Shared.pdb" />
+    <None Remove="icon.ico" />
     <None Remove="tor\data\geoip" />
     <None Remove="tor\data\geoip6" />
     <None Remove="tor\pluggable_transports\conjure-client.exe" />
@@ -27,9 +33,44 @@
     <None Remove="tor\tor.exe" />
     <None Remove="tor\torrc" />
   </ItemGroup>
+
+	<!-- These next lines ensure the DLLs are included in the publish output -->
+	<ItemGroup>
+		<None Update="..\BotCore\bin\$(Configuration)\net8.0\BotCore.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="..\Shared\bin\$(Configuration)\net8.0\LoboForge.TNOIRC.Shared.dll">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	
   <ItemGroup>
+    <Content Include="appicon.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\BotCore.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\BotCore.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Bots\GoblinTestBot.cs">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\LoboForge.TNOIRC.Shared.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\LoboForge.TNOIRC.Shared.pdb">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ElectronNET\Assets\appicon.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="ElectronNET\Assets\icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="tor\data\geoip">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -61,6 +102,13 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BotCore\BotCore.csproj" />
+    <ProjectReference Include="..\LoboForge.TNOIRC.Shared\LoboForge.TNOIRC.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Update="wwwroot\appicon.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="wwwroot\css\bootstrap\bootstrap.min.css">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -91,6 +139,9 @@
     <Content Update="wwwroot\favicon.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Update="wwwroot\icon.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Update="wwwroot\TrustNoOneIcon.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -99,9 +150,5 @@
     <Content Update="electron.manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="BotCore\NewFolder\" />
-    <Folder Include="NewFolder\" />
   </ItemGroup>
 </Project>
