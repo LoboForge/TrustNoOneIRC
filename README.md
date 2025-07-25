@@ -21,7 +21,7 @@ This project brings a modern UI, hardened opsec, and the classic power of IRC to
 
 ## 📸 Screenshot
 
-![Demo UI](https://www.loboforge.com/LoboForge.TNOIRC.png)
+![Demo UI]([https://www.loboforge.com/LoboForge.TNOIRC.png](https://www.loboforge.com/LoboForge.TNOIRC.png))
 
 _"You're in a dark room... connected to an IRC server... over Tor... with cert-based auth... this is not your grandpa’s IRC client."_
 
