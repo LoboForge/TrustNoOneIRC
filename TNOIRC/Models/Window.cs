@@ -25,6 +25,7 @@ namespace LoboForge.TNOIRC.Models
         Settings,
         Commands,
         AutoReply,
-        BotManager
+        BotManager,
+        AlertManager
     }
 }

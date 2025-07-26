@@ -1,0 +1,77 @@
+﻿@using LoboForge.TNOIRC.Models
+@inject IJSRuntime JS
+
+<h3>🔔 Alert Rules</h3>
+
+<ul>
+    @foreach (var rule in Common.Config.AlertRules)
+    {
+        <li style="margin-bottom:1rem;">
+            <div>
+                <label>Event Type:</label>
+                <select @bind="rule.EventType">
+                    <option value="PrivateMessage">Private Message</option>
+                    <option value="UserJoined">User Joined Channel</option>
+                    <option value="ChannelMessage">Channel Message</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Target User:</label>
+                <input type="text" @bind="rule.TargetUser" placeholder="Optional nick" />
+            </div>
+
+            <div>
+                <label>Channel:</label>
+                <input type="text" @bind="rule.Channel" placeholder="Optional #channel" />
+            </div>
+
+            <div>
+                <label>Sound File:</label>
+                <input type="text" @bind="rule.SoundFile" placeholder="e.g. ding.mp3" />
+                <button @onclick="() => PlaySound(rule.SoundFile)">🔊 Test</button>
+            </div>
+            <div>
+                <label>Toast Message:</label>
+                <input type="text" @bind="rule.ToastMessage" placeholder="e.g. Private message alert!" />
+            </div>
+            <div>
+                <label>Trigger Word:</label>
+                <input type="text" @bind="rule.TriggerWord" placeholder="e.g. yourNick or !important" />
+            </div>
+
+            <div>
+                <label><input type="checkbox" @bind="rule.Enabled" /> Enabled</label>
+                <button class="btn btn-sm btn-danger ms-2" @onclick="() => RemoveRule(rule)">❌ Remove</button>
+            </div>
+        </li>
+    }
+</ul>
+
+<h4>Add New Rule</h4>
+<div class="mb-2">
+    <button class="btn btn-primary" @onclick="AddNewRule">➕ Add Rule</button>
+    <button class="btn btn-success ms-2" @onclick="Save">💾 Save</button>
+</div>
+
+@code {
+    private void AddNewRule()
+    {
+        Common.Config.AlertRules.Add(new AlertRule());
+    }
+
+    private void RemoveRule(AlertRule rule)
+    {
+        Common.Config.AlertRules.Remove(rule);
+    }
+
+    private void Save()
+    {
+        ConfigService.Save();
+    }
+
+    private async Task PlaySound(string file)
+    {
+        await JS.InvokeVoidAsync("playSound", file);
+    }
+}

@@ -1,12 +1,16 @@
 ﻿@using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.BotEngine
+@using LoboForge.TNOIRC.Shared.Models
 @using global::BotCore.Interfaces
 @implements IDisposable
 
 <div class="container mt-3">
     <h4>IRC Bot Manager</h4>
-
+    <div class="mb-3">
+        <label for="botPath">Bot Folder Override:</label>
+        <input id="botPath" class="form-control form-control-sm" @bind="BotFolderOverride" placeholder="e.g. C:\MyBots or ./Bots" />
+    </div>
     <div class="mb-3 d-flex align-items-center gap-3">
         <button class="btn btn-sm btn-outline-primary" @onclick="ReloadBots">🔄 Reload Bots</button>
     </div>
@@ -78,11 +82,14 @@
         SelectedBot = Bots.FirstOrDefault();
     }
 
+    private string BotFolderOverride = "D:\\Development\\TrustNoOneIRC\\GhostRootBot";
+
     private void LoadBots()
     {
-        (Bots, Errors) = PluginService.ReloadBots();
+        (Bots, Errors) = PluginService.ReloadBots(BotFolderOverride);
         StateHasChanged();
     }
+
 
     private void ReloadBots()
     {
@@ -93,12 +100,29 @@
     {
         bot.Enabled = true;
         PluginService.ApplyBotState(bot);
+        EventBus.Subscribe<BotPrivateMessageEvent>(evt =>
+        {
+            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Nick} :{evt.Message}");
+        });
+        EventBus.Subscribe<BotSendChannelMessageEvent>(evt =>
+        {
+            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Channel} :{evt.Message}");
+        });
+
     }
 
     private void DisableBot(IBotMetadata bot)
     {
         bot.Enabled = false;
         PluginService.ApplyBotState(bot);
+        EventBus.Unsubscribe<BotPrivateMessageEvent>(evt =>
+        {
+            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Nick} :{evt.Message}");
+        });
+        EventBus.Unsubscribe<BotSendChannelMessageEvent>(evt =>
+        {
+            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Channel} :{evt.Message}");
+        });
     }
 
     public void Dispose()

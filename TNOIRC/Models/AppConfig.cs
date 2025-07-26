@@ -8,4 +8,5 @@ public class AppConfig
         new IrcServerProfile { Name = "Default", Host = "irc.libera.chat", Port = 6697 }
     };
     public List<AutoReply> AutoReplies { get; set; } = new();
+    public List<AlertRule> AlertRules { get; set; } = new();
 }

@@ -2,8 +2,6 @@
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
-IRC.Services
-@using LoboForge.TNOIRC.Shared
 
 <div class="chat-window-content d-flex flex-column">
     <div class="flex-grow-1 d-flex overflow-hidden">
@@ -15,7 +13,8 @@ IRC.Services
                     <li style="margin-bottom: 1rem;">
                         <div><b>Trigger:</b> <code>@phrase.Trigger</code></div>
                         <div><b>Reply:</b> <code>@phrase.Reply</code></div>
-                        <div>
+
+                        <div class="mt-1">
                             <label>
                                 <input type="checkbox" @bind="phrase.Enabled" />
                                 Enabled
@@ -29,6 +28,16 @@ IRC.Services
                                 ChannelMessages (ALL)
                             </label>
                         </div>
+
+                        <div>
+                            <label>Limit to Channel:</label>
+                            <input type="text" style="width:150px" placeholder="#channel" @bind="phrase.TargetChannel" />
+                        </div>
+                        <div>
+                            <label>Limit to Sender:</label>
+                            <input type="text" style="width:150px" placeholder="sender nick" @bind="phrase.SenderNick" />
+                        </div>
+
                         <div>
                             <label>Min Delay (s):</label>
                             <input type="number" step="0.1" min="0" style="width:60px" @bind="phrase.MinDelay" />
@@ -36,8 +45,10 @@ IRC.Services
                             <label>Max Delay (s):</label>
                             <input type="number" step="0.1" min="0" style="width:60px" @bind="phrase.MaxDelay" />
                         </div>
-                        <button @onclick="() => RemovePhrase(phrase)">❌</button>
+
+                        <button class="btn btn-sm btn-outline-danger mt-1" @onclick="() => RemovePhrase(phrase)">❌ Remove</button>
                     </li>
+
                 }
             </ul>
         </div>
@@ -47,6 +58,8 @@ IRC.Services
         <input type="text" placeholder="Trigger phrase (e.g. wolf)" @bind-value="NewTrigger" />
         <input type="text" placeholder="Reply message (e.g. ahoooo!)" @bind-value="NewReply" />
         <button @onclick="AddPhrase">Add Auto Reply</button>
+        <button class="btn btn-success" @onclick="SaveAll">💾 Save Changes</button>
+
     </div>
 </div>
 
@@ -68,6 +81,11 @@ IRC.Services
         EventBus.Subscribe<PrivateMessageReceivedEvent>(_privateHandler);
         EventBus.Subscribe<ChannelMessageReceivedEvent>(_channelHandler);
     }
+    private void SaveAll()
+    {
+        ConfigService.Save();
+    }
+
 
     private void AddPhrase()
     {
@@ -100,15 +118,19 @@ IRC.Services
         {
             if (!pair.Enabled || !pair.PrivateMessages) continue;
 
+            // Match sender
+            if (!string.IsNullOrWhiteSpace(pair.SenderNick) &&
+                !evt.Sender.Nick.Equals(pair.SenderNick, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             if (evt.Message.Content.Contains(pair.Trigger, StringComparison.OrdinalIgnoreCase))
             {
                 double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
                 await Task.Delay(TimeSpan.FromSeconds(delay));
-                Common.ircClient.SendMessageAsync(evt.Sender.Nick, pair.Reply);
+                await Common.ircClient.SendMessageAsync(evt.Sender.Nick, pair.Reply);
                 break;
             }
         }
-
     }
     public async void HandleChannelMessage(ChannelMessageReceivedEvent evt)
     {
@@ -116,16 +138,28 @@ IRC.Services
         {
             if (!pair.Enabled || !pair.ChannelMessages) continue;
 
+            // Match channel
+            if (!string.IsNullOrWhiteSpace(pair.TargetChannel) &&
+                !evt.Target.Equals(pair.TargetChannel, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            // Match sender
+            if (!string.IsNullOrWhiteSpace(pair.SenderNick) &&
+                !evt.Sender.Nick.Equals(pair.SenderNick, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             if (evt.Content.Contains(pair.Trigger, StringComparison.OrdinalIgnoreCase))
             {
                 double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
                 await Task.Delay(TimeSpan.FromSeconds(delay));
-                Common.ircClient.SendMessageAsync(evt.Target, pair.Reply);
+                await Common.ircClient.SendMessageAsync(evt.Target, pair.Reply);
                 break;
             }
         }
-
     }
+
+
+
     public void Dispose()
     {
         if (_privateHandler != null)

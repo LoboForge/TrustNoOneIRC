@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Content\Rooms\" />
+    <Folder Include="Data\Players\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BotCore">
+      <HintPath>Dlls\BotCore.dll</HintPath>
+    </Reference>
+    <Reference Include="LoboForge.TNOIRC.Shared">
+      <HintPath>Dlls\LoboForge.TNOIRC.Shared.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

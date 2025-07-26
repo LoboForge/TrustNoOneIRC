@@ -11,13 +11,19 @@ else
 {
     <div class="private-message-window d-flex flex-column">
         <div class="pm-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
-            @foreach (var msg in Conversation.Messages)
+            @try {
+                @foreach (var msg in Conversation.Messages)
+                {
+                    <div class="pm-message">
+                        <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                        <span class="user">@msg.Sender.Nick:</span>
+                        <span class="text">@msg.Content</span>
+                    </div>
+                }
+            }
+            catch (Exception)
             {
-                <div class="pm-message">
-                    <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                    <span class="user">@msg.Sender.Nick:</span>
-                    <span class="text">@msg.Content</span>
-                </div>
+                <button @onclick="()=>{ StateHasChanged(); }">Refresh</button>
             }
         </div>
 

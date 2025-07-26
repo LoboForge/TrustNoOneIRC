@@ -9,19 +9,27 @@ namespace LoboForge.TNOIRC.BotEngine
 {
     public class PluginService
     {
-        private readonly string _botDirectory = Path.Combine(AppContext.BaseDirectory, "Bots");
         private readonly List<IBotMetadata> _bots = new();
         private readonly List<string> _errors = new();
+        private readonly string _defaultBotDirectory = Path.Combine(AppContext.BaseDirectory, "Bots");
 
-        public (List<IBotMetadata> Bots, List<string> Errors) ReloadBots()
+        /// <summary>
+        /// Reloads all bot scripts from the specified folder or the default /Bots directory.
+        /// </summary>
+        /// <param name="folderOverride">Optional path to a bot folder. If null or empty, defaults to /Bots.</param>
+        public (List<IBotMetadata> Bots, List<string> Errors) ReloadBots(string? folderOverride = null)
         {
             _bots.Clear();
             _errors.Clear();
 
-            if (!Directory.Exists(_botDirectory))
-                Directory.CreateDirectory(_botDirectory);
+            var botPath = !string.IsNullOrWhiteSpace(folderOverride)
+                ? Path.GetFullPath(folderOverride)
+                : _defaultBotDirectory;
 
-            foreach (var file in Directory.GetFiles(_botDirectory, "*.cs"))
+            if (!Directory.Exists(botPath))
+                Directory.CreateDirectory(botPath);
+
+            foreach (var file in Directory.GetFiles(botPath, "*.cs", SearchOption.TopDirectoryOnly))
             {
                 try
                 {
@@ -63,6 +71,9 @@ namespace LoboForge.TNOIRC.BotEngine
             return (_bots.ToList(), _errors.ToList());
         }
 
+        /// <summary>
+        /// Enables or disables a bot instance based on its Enabled state.
+        /// </summary>
         public void ApplyBotState(IBotMetadata bot)
         {
             if (bot.Enabled)
@@ -75,6 +86,9 @@ namespace LoboForge.TNOIRC.BotEngine
             }
         }
 
+        /// <summary>
+        /// Optional ad-hoc compile helper (currently unused).
+        /// </summary>
         private Assembly? Compile(string code)
         {
             var tree = CSharpSyntaxTree.ParseText(code);

@@ -48,5 +48,12 @@
             console.error("❌ Blazor startup failed", err);
         });
     </script>
+    <script>
+        function playSound(file) {
+          let audio = new Audio('/sounds/' + file);
+          audio.play();
+        }
+    </script>
+
 </body>
 </html>

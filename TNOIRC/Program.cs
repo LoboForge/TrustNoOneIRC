@@ -16,6 +16,7 @@ builder.WebHost.UseEnvironment("Development");
 // Blazor services
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddSingleton<ToastService>();
 
 var app = builder.Build();
 

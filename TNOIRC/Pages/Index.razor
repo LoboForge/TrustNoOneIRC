@@ -2,8 +2,12 @@
 @using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Shared
+@inject ToastService ToastService;
+@inject IJSRuntime JS;
 
 <div class="desktop">
+    <ToastContainer />
+
     @foreach (var window in OpenWindows)
     {
         <HackerWindow Title="@window.Title"
@@ -41,6 +45,9 @@
         <div class="dock-icon" title="IRC Log" @onclick="ToggleLogWindow">
             <span class="oi oi-terminal"></span>
         </div>
+        <div class="dock-icon" title="Alert Manager" @onclick="ToggleAlertManagerWindow">
+            🔔
+        </div>
 
         @foreach (var channel in Common.ircClient.JoinedChannels)
         {
@@ -58,6 +65,7 @@
 @code {
     private List<Window> OpenWindows = new();
     private readonly List<PrivateConversation> PMs = new();
+
 
     protected override void OnInitialized()
     {
@@ -79,7 +87,129 @@
 
             convo.Messages.Add(evt.Message);
         });
+
+
+
+        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
+        {
+            TryTriggerAlert("PrivateMessage", evt.Sender.Nick, null);
+
+        });
+        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
+        {
+            var user = evt.Sender;
+
+            ToastService.Show($"📨 Private message from {user.Nick}", ToastLevel.Info);
+
+            var convo = PMs.FirstOrDefault(p => p.User.Nick == user.Nick);
+            if (convo == null)
+            {
+                convo = new PrivateConversation(user);
+                PMs.Add(convo);
+                OpenPrivateMessageWindow(convo);
+            }
+
+            convo.Messages.Add(evt.Message);
+        });
+
+        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
+        {
+            TryTriggerAlert("PrivateMessage", evt.Sender.Nick, null, evt.Message.Content);
+        });
+
+        EventBus.Subscribe<ChannelMessageReceivedEvent>((evt) =>
+        {
+            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content);
+        });
+
+        EventBus.Subscribe<UserJoinedEvent>((evt) =>
+        {
+            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel);
+        });
+        EventBus.Subscribe<UserJoinedEvent>((evt) =>
+        {
+            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel);
+        });
+
     }
+
+
+    private async void TryTriggerAlert(string eventType, string user, string? channel, string? message = null)
+    {
+        foreach (var rule in Common.Config.AlertRules)
+        {
+            try
+            {
+                Console.WriteLine($"Evaluating rule: {rule.EventType} for event {eventType}");
+
+                if (!rule.Enabled || rule.EventType != eventType)
+                {
+                    Console.WriteLine("Rule disabled or event type mismatch.");
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(rule.TargetUser) &&
+                    !rule.TargetUser.Equals(user, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"User mismatch: rule={rule.TargetUser}, actual={user}");
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(rule.Channel) &&
+                    !string.Equals(rule.Channel, channel, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"Channel mismatch: rule={rule.Channel}, actual={channel}");
+                    continue;
+                }
+
+                if (!string.IsNullOrWhiteSpace(rule.TriggerWord) &&
+                    (string.IsNullOrWhiteSpace(message) || !message.Contains(rule.TriggerWord, StringComparison.OrdinalIgnoreCase)))
+                {
+                    Console.WriteLine($"Trigger word '{rule.TriggerWord}' not found in message.");
+                    continue;
+                }
+
+                Console.WriteLine("Triggering toast and sound!");
+
+                if (!string.IsNullOrWhiteSpace(rule.ToastMessage))
+                    ToastService.Show(rule.ToastMessage, ToastLevel.Info);
+
+                if (!string.IsNullOrWhiteSpace(rule.SoundFile))
+                    await JS.InvokeVoidAsync("playSound", rule.SoundFile);
+
+                break;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TryTriggerAlert Exception: {ex.Message}");
+            }
+        }
+
+
+    }
+
+    private void ToggleAlertManagerWindow(MouseEventArgs args)
+    {
+        var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.AlertManager);
+        if (existing != null)
+            OpenWindows.Remove(existing);
+        else
+        {
+            var window = new Window
+            {
+                Title = "Alert Manager",
+                Type = WindowType.AlertManager,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(AlertManagerWindow));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+        }
+    }
+
     private void UpdateWindowPosition(Window window, (int Top, int Left) pos)
     {
         window.Top = pos.Top;
@@ -160,6 +290,7 @@
             Type = WindowType.PM,
             ChildContent = fragment
         });
+        StateHasChanged();
     }
     private void OpenChatWindow(IrcChannel channel)
     {

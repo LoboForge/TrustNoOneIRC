@@ -35,14 +35,6 @@ public class MessageReceivedEvent
 }
 
 /// <summary>
-/// Raised when the client joins a channel.
-/// </summary>
-public class ChannelJoinedEvent : IIrcEvent
-{
-    public string Channel { get; set; }
-}
-
-/// <summary>
 /// Raised when the client leaves a channel.
 /// </summary>
 public class ChannelLeftEvent : IIrcEvent

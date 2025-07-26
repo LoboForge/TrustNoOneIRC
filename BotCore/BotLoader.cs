@@ -1,4 +1,5 @@
 ﻿using BotCore.Interfaces;
+using LoboForge.TNOIRC.Shared.Models;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -48,6 +49,7 @@ public class BotLoader
                         if (Activator.CreateInstance(type) is IBot instance)
                         {
                             Console.WriteLine($"[BotLoader] Initialized bot: {instance.Name}");
+
                         }
                     }
                     catch (Exception botEx)

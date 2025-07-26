@@ -11,3 +11,9 @@
 /BotCore/bin/Release/net8.0
 /LoboForge.TNOIRC.Shared/bin/Release/net8.0
 /obj/desktop/windows/bin
+/GhostRootBot/.vs/GhostRootBot
+/GhostRootBot/bin/Debug/net8.0
+/GhostRootBot/obj
+/obj/desktop/linux/bin
+/TNOIRC/Bots/.vs
+/TNOIRC/publish

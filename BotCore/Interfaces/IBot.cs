@@ -1,15 +1,21 @@
-﻿namespace BotCore.Interfaces;
+﻿using LoboForge.TNOIRC.Shared.Models;
 
-public interface IBot
+namespace BotCore.Interfaces
 {
-    string Name { get; }
+    public interface IBot
+    {
+        string Name { get; set; }
 
-    void OnStart();
-    void OnPM() { }
-    void OnJoin() { }
-    void OnSelfJoin() { }
-    void OnChannelMessage() { }
-    void OnTick() { }
-    void OnStop();
+        void OnStart();
+        void OnStop();
 
+        void OnPM(PrivateMessageReceivedEvent evt);
+        void OnJoin(UserJoinedEvent evt);
+        void OnSelfJoin(SelfJoinedChannelEvent evt);
+        void OnChannelMessage(ChannelMessageReceivedEvent evt);
+        void OnTick();
+
+        void SendPM(string nick, string message);
+        void SendToChannel(string channel, string message);
+    }
 }

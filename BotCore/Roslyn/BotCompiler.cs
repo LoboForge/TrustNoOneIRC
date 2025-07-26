@@ -7,7 +7,6 @@ namespace TNO.IRC.BotEngine;
 
 public class BotCompiler
 {
-
     public IEnumerable<Type> Compile(string code, out Assembly? assembly, out List<string> errors)
     {
         errors = new();
@@ -15,27 +14,42 @@ public class BotCompiler
 
         var syntaxTree = CSharpSyntaxTree.ParseText(code);
 
-        // Collect default runtime references
-        var references = new List<MetadataReference>();
-        var loadedAssemblies = AppDomain.CurrentDomain
+        // Start with all currently loaded assemblies
+        var assemblies = AppDomain.CurrentDomain
             .GetAssemblies()
             .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location))
-            .Select(a => a.Location)
-            .Distinct();
+            .ToList();
 
-        foreach (var path in loadedAssemblies)
+        // 🔧 Manually ensure critical framework references are added
+        var requiredFrameworkAssemblies = new[]
+        {
+            typeof(object).Assembly,                    // System.Private.CoreLib
+            typeof(Console).Assembly,                   // System.Console
+            typeof(List<>).Assembly,                    // System.Collections
+            typeof(StringComparison).Assembly,          // System.Runtime (needed!)
+            typeof(Enumerable).Assembly                 // System.Linq
+        };
+
+        foreach (var asm in requiredFrameworkAssemblies)
+        {
+            if (!assemblies.Contains(asm))
+                assemblies.Add(asm);
+        }
+
+        var references = new List<MetadataReference>();
+        foreach (var asm in assemblies.Distinct())
         {
             try
             {
-                references.Add(MetadataReference.CreateFromFile(path));
+                references.Add(MetadataReference.CreateFromFile(asm.Location));
             }
             catch (Exception ex)
             {
-                errors.Add($"[BotCompiler] Failed to load reference: {path} - {ex.Message}");
+                errors.Add($"[BotCompiler] Failed to load reference: {asm.Location} - {ex.Message}");
             }
         }
 
-        // Manually include known critical project DLLs
+        // 📦 Include known project DLLs if needed (already handled here)
         string[] manualDlls =
         {
             "Bots\\BotCore.dll",
@@ -87,5 +101,4 @@ public class BotCompiler
 
         return botTypes;
     }
-
 }

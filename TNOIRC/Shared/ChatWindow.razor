@@ -29,21 +29,29 @@ else
                 <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
                     @foreach (var msg in Channel.Messages)
                     {
-                        if (!msg.IsAction)
-                        {
-                            <div class="chat-message">
-                                <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                                <span class="user">@msg.Sender.Nick:</span>
-                                <span class="text">@msg.Content</span>
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="chat-message">
-                                <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                                <span class="user" style="font-weight:bold;">** @msg.Sender.Nick @msg.Content **</span>
-                            </div>
-                        }
+                    @if (!msg.IsAction)
+                    {
+                        <div class="chat-message">
+                            <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                            <span class="user">@msg.Sender.Nick:</span>
+                            <span class="text">
+                                @foreach (var line in msg.Content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
+                                {
+                                    @line
+                    
+                                    <br />
+                                }
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="chat-message">
+                            <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                            <span class="user" style="font-weight:bold;">** @msg.Sender.Nick @msg.Content **</span>
+                        </div>
+                    }
+
                     }
                 </div>
             </div>
@@ -132,7 +140,7 @@ else
 
     private async Task ScrollToBottom()
     {
-        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
+         await InvokeAsync(()=>  JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv));
     }
 
 
