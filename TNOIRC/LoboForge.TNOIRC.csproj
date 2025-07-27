@@ -16,7 +16,10 @@
     <None Remove="bin\**" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Remove="Bots\GhostRootBot.cs" />
     <Compile Remove="Bots\GoblinTestBot.cs" />
+    <Compile Remove="Bots\PlayerProfile.cs" />
+    <Compile Remove="Bots\PlayerService.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="appicon.png" />
@@ -53,13 +56,22 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Bots\BotCore.pdb">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\GhostRootBot.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Bots\LoboForge.TNOIRC.Shared.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Bots\LoboForge.TNOIRC.Shared.pdb">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\PlayerProfile.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Bots\PlayerService.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="ElectronNET\Assets\appicon.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

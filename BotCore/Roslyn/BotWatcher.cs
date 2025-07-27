@@ -31,15 +31,13 @@ public class BotWatcher
     {
         try
         {
-            if (!File.Exists(e.FullPath)) return;
-
-            var code = File.ReadAllText(e.FullPath);
+            // Always recompile all .cs files in the folder for proper context/dependency!
             var compiler = new BotCompiler();
-            var types = compiler.Compile(code, out var assembly, out var errors);
+            var types = compiler.CompileAll(_botDirectory, out var assembly, out var errors);
 
             if (errors.Any())
             {
-                Console.WriteLine($"[HotReload Error] {Path.GetFileName(e.FullPath)}:");
+                Console.WriteLine($"[HotReload Error] [{_botDirectory}]:");
                 foreach (var error in errors)
                     Console.WriteLine("  " + error);
                 return;
@@ -67,4 +65,5 @@ public class BotWatcher
             Console.WriteLine($"[HotReload Exception] {ex.Message}");
         }
     }
+
 }

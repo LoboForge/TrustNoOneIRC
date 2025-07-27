@@ -2,8 +2,8 @@
 @using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Shared
-@inject ToastService ToastService;
-@inject IJSRuntime JS;
+@inject ToastService ToastService
+@inject IJSRuntime JS
 
 <div class="desktop">
     <ToastContainer />
@@ -21,7 +21,6 @@
             @window.ChildContent
         </HackerWindow>
     }
-
 
     <div class="desktop-dock">
         <div class="dock-icon" title="Tile All" @onclick="TileAllWindows">
@@ -66,73 +65,51 @@
     private List<Window> OpenWindows = new();
     private readonly List<PrivateConversation> PMs = new();
 
-
     protected override void OnInitialized()
     {
         base.OnInitialized();
+
+        EventBus.Unsubscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
+        EventBus.Unsubscribe<RequestPrivateMessageEvent>(HandlePmRequest);
+        EventBus.Unsubscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
+        EventBus.Unsubscribe<ChannelMessageReceivedEvent>((evt) =>
+            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content));
+
+        EventBus.Unsubscribe<UserJoinedEvent>((evt) =>
+            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel));
+
+
+        // --- SINGLE handler per event ---
         EventBus.Subscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
         EventBus.Subscribe<RequestPrivateMessageEvent>(HandlePmRequest);
-        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
-        {
-            var user = evt.Sender;
-
-            var convo = PMs.FirstOrDefault(p => p.User.Nick == user.Nick);
-            if (convo == null)
-            {
-                convo = new PrivateConversation(user);
-                PMs.Add(convo);
-
-                OpenPrivateMessageWindow(convo);
-            }
-
-            convo.Messages.Add(evt.Message);
-        });
-
-
-
-        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
-        {
-            TryTriggerAlert("PrivateMessage", evt.Sender.Nick, null);
-
-        });
-        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
-        {
-            var user = evt.Sender;
-
-            ToastService.Show($"📨 Private message from {user.Nick}", ToastLevel.Info);
-
-            var convo = PMs.FirstOrDefault(p => p.User.Nick == user.Nick);
-            if (convo == null)
-            {
-                convo = new PrivateConversation(user);
-                PMs.Add(convo);
-                OpenPrivateMessageWindow(convo);
-            }
-
-            convo.Messages.Add(evt.Message);
-        });
-
-        EventBus.Subscribe<PrivateMessageReceivedEvent>((evt) =>
-        {
-            TryTriggerAlert("PrivateMessage", evt.Sender.Nick, null, evt.Message.Content);
-        });
+        EventBus.Subscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
 
         EventBus.Subscribe<ChannelMessageReceivedEvent>((evt) =>
-        {
-            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content);
-        });
+            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content));
 
         EventBus.Subscribe<UserJoinedEvent>((evt) =>
-        {
-            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel);
-        });
-        EventBus.Subscribe<UserJoinedEvent>((evt) =>
-        {
-            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel);
-        });
-
+            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel));
     }
 
+    private void HandlePrivateMessage(PrivateMessageReceivedEvent evt)
+    {
+        var user = evt.Sender;
+
+        // Find or create PM conversation
+        var convo = PMs.FirstOrDefault(p => p.User.Nick == user.Nick);
+        if (convo == null)
+        {
+            convo = new PrivateConversation(user);
+            PMs.Add(convo);
+            OpenPrivateMessageWindow(convo);
+        }
+
+        convo.Messages.Add(evt.Message);
+
+        // Toast + alert (only once)
+        ToastService.Show($"📨 Private message from {user.Nick}", ToastLevel.Info);
+        TryTriggerAlert("PrivateMessage", user.Nick, null, evt.Message.Content);
+    }
 
     private async void TryTriggerAlert(string eventType, string user, string? channel, string? message = null)
     {
@@ -140,36 +117,20 @@
         {
             try
             {
-                Console.WriteLine($"Evaluating rule: {rule.EventType} for event {eventType}");
-
                 if (!rule.Enabled || rule.EventType != eventType)
-                {
-                    Console.WriteLine("Rule disabled or event type mismatch.");
                     continue;
-                }
 
                 if (!string.IsNullOrWhiteSpace(rule.TargetUser) &&
                     !rule.TargetUser.Equals(user, StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.WriteLine($"User mismatch: rule={rule.TargetUser}, actual={user}");
                     continue;
-                }
 
                 if (!string.IsNullOrWhiteSpace(rule.Channel) &&
                     !string.Equals(rule.Channel, channel, StringComparison.OrdinalIgnoreCase))
-                {
-                    Console.WriteLine($"Channel mismatch: rule={rule.Channel}, actual={channel}");
                     continue;
-                }
 
                 if (!string.IsNullOrWhiteSpace(rule.TriggerWord) &&
                     (string.IsNullOrWhiteSpace(message) || !message.Contains(rule.TriggerWord, StringComparison.OrdinalIgnoreCase)))
-                {
-                    Console.WriteLine($"Trigger word '{rule.TriggerWord}' not found in message.");
                     continue;
-                }
-
-                Console.WriteLine("Triggering toast and sound!");
 
                 if (!string.IsNullOrWhiteSpace(rule.ToastMessage))
                     ToastService.Show(rule.ToastMessage, ToastLevel.Info);
@@ -177,70 +138,13 @@
                 if (!string.IsNullOrWhiteSpace(rule.SoundFile))
                     await JS.InvokeVoidAsync("playSound", rule.SoundFile);
 
-                break;
+                break; // Only trigger the first matching rule
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"TryTriggerAlert Exception: {ex.Message}");
             }
         }
-
-
-    }
-
-    private void ToggleAlertManagerWindow(MouseEventArgs args)
-    {
-        var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.AlertManager);
-        if (existing != null)
-            OpenWindows.Remove(existing);
-        else
-        {
-            var window = new Window
-            {
-                Title = "Alert Manager",
-                Type = WindowType.AlertManager,
-                ChildContent = builder =>
-                {
-                    builder.OpenComponent(0, typeof(AlertManagerWindow));
-                    builder.CloseComponent();
-                }
-            };
-
-            OpenWindows.Add(window);
-        }
-    }
-
-    private void UpdateWindowPosition(Window window, (int Top, int Left) pos)
-    {
-        window.Top = pos.Top;
-        window.Left = pos.Left;
-    }
-    private void TileAllWindows()
-    {
-        int total = OpenWindows.Count;
-        if (total == 0) return;
-
-        int columns = (int)Math.Ceiling(Math.Sqrt(total));
-        int rows = (int)Math.Ceiling((double)total / columns);
-
-        int desktopWidth = 1280;  // TODO: replace with JSInterop screen width later
-        int desktopHeight = 720;
-
-        int tileWidth = desktopWidth / columns;
-        int tileHeight = desktopHeight / rows;
-
-        for (int i = 0; i < total; i++)
-        {
-            int row = i / columns;
-            int col = i % columns;
-
-            OpenWindows[i].Top = row * tileHeight;
-            OpenWindows[i].Left = col * tileWidth;
-            OpenWindows[i].Width = tileWidth;
-            OpenWindows[i].Height = tileHeight;
-        }
-
-        StateHasChanged();
     }
 
     private void HandlePmRequest(RequestPrivateMessageEvent evt)
@@ -257,9 +161,9 @@
         OpenPrivateMessageWindow(convo);
         StateHasChanged();
     }
+
     private void HandleWindowClose(Window window)
     {
-        // Channel-specific cleanup
         if (window.Type == WindowType.Channel)
         {
             var channel = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == window.Title);
@@ -292,6 +196,7 @@
         });
         StateHasChanged();
     }
+
     private void OpenChatWindow(IrcChannel channel)
     {
         if (OpenWindows.Any(w => w.Title == channel.Name)) return;
@@ -300,7 +205,6 @@
         {
             Title = channel.Name,
             Type = WindowType.Channel,
-
         };
         window.ChildContent = builder =>
         {
@@ -315,6 +219,7 @@
 
         OpenWindows.Add(window);
     }
+
     void RemoveWindowById(string id)
     {
         OpenWindows.RemoveAll(w => w.ID == id);
@@ -341,33 +246,89 @@
             Common.ircClient.LeaveChannel(joined.Name, "Leaving...");
             Common.ircClient.JoinedChannels.Remove(joined);
         }
-
     }
 
-    public void Dispose()
+    // ---- Dock Button Windows ----
+
+    private void ToggleAlertManagerWindow(MouseEventArgs args)
     {
-        EventBus.Unsubscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
+        var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.AlertManager);
+        if (existing != null)
+            OpenWindows.Remove(existing);
+        else
+        {
+            var window = new Window
+            {
+                Title = "Alert Manager",
+                Type = WindowType.AlertManager,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(AlertManagerWindow));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+        }
     }
+
+    private void UpdateWindowPosition(Window window, (int Top, int Left) pos)
+    {
+        window.Top = pos.Top;
+        window.Left = pos.Left;
+    }
+
+    private void TileAllWindows()
+    {
+        int total = OpenWindows.Count;
+        if (total == 0) return;
+
+        int columns = (int)Math.Ceiling(Math.Sqrt(total));
+        int rows = (int)Math.Ceiling((double)total / columns);
+
+        int desktopWidth = 1280;  // TODO: replace with JSInterop screen width later
+        int desktopHeight = 720;
+
+        int tileWidth = desktopWidth / columns;
+        int tileHeight = desktopHeight / rows;
+
+        for (int i = 0; i < total; i++)
+        {
+            int row = i / columns;
+            int col = i % columns;
+
+            OpenWindows[i].Top = row * tileHeight;
+            OpenWindows[i].Left = col * tileWidth;
+            OpenWindows[i].Width = tileWidth;
+            OpenWindows[i].Height = tileHeight;
+        }
+
+        StateHasChanged();
+    }
+
+    // --- Other Toggle Methods (unchanged, just compacted for space) ---
 
     private void ToggleConnectionWindow(MouseEventArgs args)
     {
         var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Settings);
         if (logwindow != null) OpenWindows.Remove(logwindow);
-        else {
+        else
+        {
             var window = new Window
+            {
+                Title = "IRC Connection",
+                Type = WindowType.Settings,
+                ChildContent = builder =>
                 {
-                    Title = "IRC Connection",
-                    Type = WindowType.Settings,
-                    ChildContent = builder =>
-                    {
-                        builder.OpenComponent(0, typeof(ConnectionWindow));
-                        builder.CloseComponent();
-                    }
-                };
+                    builder.OpenComponent(0, typeof(ConnectionWindow));
+                    builder.CloseComponent();
+                }
+            };
 
             OpenWindows.Add(window);
         }
     }
+
     private void ToggleCommandWindow(MouseEventArgs args)
     {
         var commandwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Commands);
@@ -385,10 +346,10 @@
                 }
             };
 
-
             OpenWindows.Add(window);
         }
     }
+
     private void ToggleReplyBotWindow(MouseEventArgs args)
     {
         var commandwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.AutoReply);
@@ -406,10 +367,10 @@
                 }
             };
 
-
             OpenWindows.Add(window);
         }
     }
+
     private void ToggleLogWindow(MouseEventArgs args)
     {
         var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Log);
@@ -430,6 +391,7 @@
             OpenWindows.Add(window);
         }
     }
+
     private void JoinChannelWindow(MouseEventArgs args)
     {
         var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Join);
@@ -450,6 +412,7 @@
             OpenWindows.Add(window);
         }
     }
+
     private void ToggleBotManagerWindow(MouseEventArgs args)
     {
         var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.BotManager);
@@ -472,5 +435,18 @@
 
             OpenWindows.Add(window);
         }
+    }
+
+    public void Dispose()
+    {
+        //This is probably pointless, becuase if you leave this page the whole app is done anyway. oh well 
+        EventBus.Unsubscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
+        EventBus.Unsubscribe<RequestPrivateMessageEvent>(HandlePmRequest);
+        EventBus.Unsubscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
+        EventBus.Unsubscribe<ChannelMessageReceivedEvent>((evt) =>
+            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content));
+
+        EventBus.Unsubscribe<UserJoinedEvent>((evt) =>
+            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel));
     }
 }

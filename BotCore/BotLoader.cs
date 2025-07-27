@@ -23,45 +23,32 @@ public class BotLoader
             return;
         }
 
-        foreach (var file in Directory.GetFiles(_botPath, "*.cs"))
-        {
-            Console.WriteLine($"[BotLoader] Loading: {Path.GetFileName(file)}");
+        Console.WriteLine($"[BotLoader] Compiling all bots in: {_botPath}");
+        var types = _compiler.CompileAll(_botPath, out var assembly, out var errors);
 
+        if (errors.Any())
+        {
+            Console.WriteLine($"[BotLoader] Errors during compilation:");
+            foreach (var err in errors)
+                Console.WriteLine($"  {err}");
+        }
+
+        foreach (var type in types)
+        {
             try
             {
-                var code = File.ReadAllText(file);
-                var types = _compiler.Compile(code, out var assembly, out var errors);
+                RuntimeHelpers.RunClassConstructor(type.TypeHandle);
 
-                if (errors.Any())
+                if (Activator.CreateInstance(type) is IBot instance)
                 {
-                    Console.WriteLine($"[BotLoader] Errors in {Path.GetFileName(file)}:");
-                    foreach (var err in errors)
-                        Console.WriteLine($"  {err}");
-                    continue;
-                }
-
-                foreach (var type in types)
-                {
-                    try
-                    {
-                        RuntimeHelpers.RunClassConstructor(type.TypeHandle);
-
-                        if (Activator.CreateInstance(type) is IBot instance)
-                        {
-                            Console.WriteLine($"[BotLoader] Initialized bot: {instance.Name}");
-
-                        }
-                    }
-                    catch (Exception botEx)
-                    {
-                        Console.WriteLine($"[BotLoader] Error initializing {type.Name}: {botEx.Message}");
-                    }
+                    Console.WriteLine($"[BotLoader] Initialized bot: {instance.Name}");
                 }
             }
-            catch (Exception ex)
+            catch (Exception botEx)
             {
-                Console.WriteLine($"[BotLoader] Exception loading {file}: {ex.Message}");
+                Console.WriteLine($"[BotLoader] Error initializing {type.Name}: {botEx.Message}");
             }
         }
     }
+
 }

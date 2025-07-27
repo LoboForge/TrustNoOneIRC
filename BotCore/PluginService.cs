@@ -29,47 +29,43 @@ namespace LoboForge.TNOIRC.BotEngine
             if (!Directory.Exists(botPath))
                 Directory.CreateDirectory(botPath);
 
-            foreach (var file in Directory.GetFiles(botPath, "*.cs", SearchOption.TopDirectoryOnly))
+            var compiler = new BotCompiler();
+            var types = compiler.CompileAll(botPath, out var assembly, out var compileErrors);
+
+            if (compileErrors.Any())
+            {
+                _errors.AddRange(compileErrors.Select(e => $"[Bots Compilation] {e}"));
+            }
+
+            foreach (var type in types)
             {
                 try
                 {
-                    var code = File.ReadAllText(file);
-                    var compiler = new BotCompiler();
-                    var types = compiler.Compile(code, out var assembly, out var compileErrors);
+                    RuntimeHelpers.RunClassConstructor(type.TypeHandle);
 
-                    if (compileErrors.Any())
+                    if (Activator.CreateInstance(type) is IBot instance)
                     {
-                        _errors.AddRange(compileErrors.Select(e => $"[{Path.GetFileName(file)}] {e}"));
-                        continue;
-                    }
-
-                    foreach (var type in types)
-                    {
-                        RuntimeHelpers.RunClassConstructor(type.TypeHandle);
-
-                        if (Activator.CreateInstance(type) is IBot instance)
+                        var metadata = new BotMetadata
                         {
-                            var metadata = new BotMetadata
-                            {
-                                Name = instance.Name,
-                                Enabled = true,
-                                Instance = instance,
-                                SourceAssembly = assembly!
-                            };
+                            Name = instance.Name,
+                            Enabled = true,
+                            Instance = instance,
+                            SourceAssembly = assembly!
+                        };
 
-                            _bots.Add(metadata);
-                            instance.OnStart(); // Auto-start on load
-                        }
+                        _bots.Add(metadata);
+                        instance.OnStart(); // Auto-start on load
                     }
                 }
-                catch (Exception ex)
+                catch (Exception botEx)
                 {
-                    _errors.Add($"[{Path.GetFileName(file)}] {ex.Message}");
+                    _errors.Add($"[Bots Compilation] Error initializing {type.Name}: {botEx.Message}");
                 }
             }
 
             return (_bots.ToList(), _errors.ToList());
         }
+
 
         /// <summary>
         /// Enables or disables a bot instance based on its Enabled state.

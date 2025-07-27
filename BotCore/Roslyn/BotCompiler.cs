@@ -7,26 +7,27 @@ namespace TNO.IRC.BotEngine;
 
 public class BotCompiler
 {
-    public IEnumerable<Type> Compile(string code, out Assembly? assembly, out List<string> errors)
+    public IEnumerable<Type> CompileAll(string botFolder, out Assembly? assembly, out List<string> errors)
     {
         errors = new();
         assembly = null;
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(code);
+        // 1. Parse ALL .cs files in the bot folder
+        var files = Directory.GetFiles(botFolder, "*.cs");
+        var syntaxTrees = files.Select(f => CSharpSyntaxTree.ParseText(File.ReadAllText(f))).ToList();
 
-        // Start with all currently loaded assemblies
+        // 2. Gather all necessary references (same as before)
         var assemblies = AppDomain.CurrentDomain
             .GetAssemblies()
             .Where(a => !a.IsDynamic && !string.IsNullOrWhiteSpace(a.Location))
             .ToList();
 
-        // 🔧 Manually ensure critical framework references are added
         var requiredFrameworkAssemblies = new[]
         {
             typeof(object).Assembly,                    // System.Private.CoreLib
             typeof(Console).Assembly,                   // System.Console
             typeof(List<>).Assembly,                    // System.Collections
-            typeof(StringComparison).Assembly,          // System.Runtime (needed!)
+            typeof(StringComparison).Assembly,          // System.Runtime
             typeof(Enumerable).Assembly                 // System.Linq
         };
 
@@ -49,7 +50,7 @@ public class BotCompiler
             }
         }
 
-        // 📦 Include known project DLLs if needed (already handled here)
+        // 3. Manually include project-specific DLLs if needed
         string[] manualDlls =
         {
             "Bots\\BotCore.dll",
@@ -70,9 +71,10 @@ public class BotCompiler
             }
         }
 
+        // 4. Compile all trees together
         var compilation = CSharpCompilation.Create(
             Path.GetRandomFileName(),
-            new[] { syntaxTree },
+            syntaxTrees,
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );

@@ -8,5 +8,5 @@ public class PlayerProfile
     public int XP { get; set; } = 0;
     public string CurrentNode { get; set; } = "root";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public bool IsEnrolled => !string.IsNullOrEmpty(Handle);
+    public bool IsEnrolled = false;
 }
