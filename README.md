@@ -30,11 +30,11 @@ _"You're in a dark room... connected to an IRC server... over Tor... with cert-b
 ## 🧪 Try It Now
 
 ### 🪟 Windows  
-📦 [Download Windows Build](https://www.loboforge.com/Builds/WindowsBuild.zip)
+📦 [[Download Windows Build](https://www.loboforge.com/projects/tnoirc)]
 
 ### 🐧 Linux  
-📦 [Download AppImage](https://www.loboforge.com/Builds/TNOIRC.AppImage)  
-📦 [Download Snap Package](https://www.loboforge.com/Builds/TNOIRC.snap)
+📦 [[Download AppImage](https://www.loboforge.com/projects/tnoirc)]
+📦 [Download Snap Package](https://www.loboforge.com/projects/tnoirc)]
 
 > AppImage: Most common for Linux users  
 > Snap: Works great on Ubuntu and Snap-enabled distros
