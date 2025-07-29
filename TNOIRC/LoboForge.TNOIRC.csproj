@@ -58,19 +58,10 @@
     <Content Include="Bots\BotCore.pdb">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="Bots\GhostRootBot.cs">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
     <Content Include="Bots\LoboForge.TNOIRC.Shared.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Bots\LoboForge.TNOIRC.Shared.pdb">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Bots\PlayerProfile.cs">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Bots\PlayerService.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="ElectronNET\Assets\appicon.png">
@@ -113,6 +104,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BotCore\BotCore.csproj" />
+    <ProjectReference Include="..\GhostRootBot\GhostRootBot.csproj" />
     <ProjectReference Include="..\LoboForge.TNOIRC.Shared\LoboForge.TNOIRC.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -160,5 +152,9 @@
     <Content Update="electron.manifest.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="BuiltinBots\Content\Rooms\" />
+    <Folder Include="BuiltinBots\Data\Players\" />
   </ItemGroup>
 </Project>

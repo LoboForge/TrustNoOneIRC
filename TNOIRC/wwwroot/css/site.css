@@ -529,3 +529,16 @@ select:focus {
     ::-webkit-scrollbar-thumb:hover {
         background-color: #00aa88; /* Slightly brighter on hover */
     }
+
+.notice-msg {
+    background: rgba(40, 60, 80, 0.12);
+    color: #f2b630;
+    font-style: italic;
+    border-left: 3px solid #f2b630;
+    margin-bottom: 4px;
+    padding-left: 8px;
+}
+
+    .notice-msg .notice {
+        color: #f2b630;
+    }

@@ -1,5 +1,6 @@
-﻿using System.Text.Json;
-using LoboForge.TNOIRC;
+﻿using LoboForge.TNOIRC;
+using System.Reflection;
+using System.Text.Json;
 
 public static class ConfigService
 {
@@ -9,6 +10,12 @@ public static class ConfigService
 
     public static void Load()
     {
+        var dllPath = Path.Combine(AppContext.BaseDirectory, "GhostRootBot.dll");
+        if (File.Exists(dllPath))
+        {
+            Assembly.LoadFrom(dllPath);
+        }
+
         if (File.Exists(ConfigPath))
         {
             var json = File.ReadAllText(ConfigPath);

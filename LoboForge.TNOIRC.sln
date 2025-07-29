@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotCore", "BotCore\BotCore.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LoboForge.TNOIRC.Shared", "LoboForge.TNOIRC.Shared\LoboForge.TNOIRC.Shared.csproj", "{663958FB-6A8D-49CC-AE3F-21535A97C837}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GhostRootBot", "GhostRootBot\GhostRootBot.csproj", "{BD4E9061-7E4D-3F3F-97CC-896A76D22533}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{663958FB-6A8D-49CC-AE3F-21535A97C837}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD4E9061-7E4D-3F3F-97CC-896A76D22533}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD4E9061-7E4D-3F3F-97CC-896A76D22533}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD4E9061-7E4D-3F3F-97CC-896A76D22533}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD4E9061-7E4D-3F3F-97CC-896A76D22533}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

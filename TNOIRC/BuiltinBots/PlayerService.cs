@@ -27,6 +27,15 @@ public class PlayerService
 		File.WriteAllText(file, json);
 	}
 
-	private string GetPath(string nick) =>
-		Path.Combine(_basePath, $"{nick.ToLowerInvariant()}.json");
+    private string GetPath(string nick) =>
+        Path.Combine(_basePath, $"{MakeSafeFileName(nick.ToLowerInvariant())}.json");
+
+    public static string MakeSafeFileName(string input)
+    {
+        foreach (char c in Path.GetInvalidFileNameChars())
+        {
+            input = input.Replace(c, '_');
+        }
+        return input;
+    }
 }

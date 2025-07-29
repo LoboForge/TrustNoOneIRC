@@ -7,17 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Content\Rooms\" />
-    <Folder Include="Data\Players\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="BotCore">
-      <HintPath>Dlls\BotCore.dll</HintPath>
-    </Reference>
-    <Reference Include="LoboForge.TNOIRC.Shared">
-      <HintPath>Dlls\LoboForge.TNOIRC.Shared.dll</HintPath>
-    </Reference>
+    <ProjectReference Include="..\BotCore\BotCore.csproj" />
+    <ProjectReference Include="..\LoboForge.TNOIRC.Shared\LoboForge.TNOIRC.Shared.csproj" />
   </ItemGroup>
 
 </Project>

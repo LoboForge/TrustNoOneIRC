@@ -13,16 +13,29 @@ namespace BotScripts
 
         private readonly Dictionary<string, PlayerProfile> activePlayers = new();
         private readonly PlayerService playerService = new();
+        private readonly Dictionary<string, Action<PlayerProfile, Node, string, bool>> CommandHandlers;
+        private readonly NetworkMap networkMap; // <-- Don't forget to provide this!
+
+        public GhostRootBot()
+        {
+            // Initialize your node map (loads /Data/Nodes.json by default)
+            networkMap = new NetworkMap();
+
+            CommandHandlers = new Dictionary<string, Action<PlayerProfile, Node, string, bool>>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "status", HandleStatus },
+                { "look", HandleLook },
+                { "go", HandleGo },
+                // Add more commands here!
+            };
+        }
 
         public override void OnStart()
         {
             base.OnStart();
-
-            //EventBus.Subscribe<ServerMessage>(evt => Log($"[RAW] {evt.mesage}"));
             EventBus.Subscribe<PrivateMessageReceivedEvent>(OnPM);
             EventBus.Subscribe<ChannelMessageReceivedEvent>(OnChannelMessage);
             EventBus.Subscribe<UserJoinedEvent>(OnJoin);
-
             Log("Startup Complete!");
         }
 
@@ -44,7 +57,8 @@ namespace BotScripts
 
         public override void OnChannelMessage(ChannelMessageReceivedEvent evt)
         {
-            if (evt.Target != "#GhostRoot") return;
+            if (!evt.Target.Equals("#GhostRoot", StringComparison.OrdinalIgnoreCase))
+                return;
 
             Log($"Received channel message from {evt.Sender.Nick}: {evt.Content}");
             var content = evt.Content.Trim();
@@ -82,7 +96,7 @@ namespace BotScripts
             if (!profile.IsEnrolled)
             {
                 profile.Handle = message;
-                profile.IsEnrolled = true; // Important fix!
+                profile.IsEnrolled = true;
                 playerService.Save(profile);
 
                 Log($"{nick} enrolled successfully as {profile.Handle}");
@@ -90,6 +104,9 @@ namespace BotScripts
                 SendPM(nick, $"✅ Handle set to `{profile.Handle}`.");
                 SendPM(nick, $"🌐 Initializing your connection...");
                 SendToChannel("#ghostroot", $"🔌 Runner `{profile.Handle}` has jacked into GhostRoot.");
+                // Auto-look at their node
+                var node = networkMap.GetNode(profile.CurrentNode) ?? networkMap.GetNode("root");
+                HandleLook(profile, node, "", true);
                 return;
             }
 
@@ -102,8 +119,10 @@ namespace BotScripts
 
             if (profile.IsEnrolled && !string.IsNullOrWhiteSpace(profile.Handle))
             {
-                SendPM(user.Nick, $"👋 You're already enrolled as `{profile.Handle}`. Use commands like `status` or `look` to continue.");
+                SendPM(user.Nick, $"👋 You're already enrolled as `{profile.Handle}`. Use commands like `!status` or `!look` to continue.");
                 SendToChannel("#ghostroot", $"🧠 {user.Nick}, you're already jacked in. Check your PM for details.");
+                var node = networkMap.GetNode(profile.CurrentNode) ?? networkMap.GetNode("root");
+                HandleLook(profile, node, "", true);
                 Log($"Reminded already enrolled user {user.Nick} of their profile.");
             }
             else if (!string.IsNullOrWhiteSpace(profile.Handle))
@@ -113,6 +132,8 @@ namespace BotScripts
 
                 SendPM(user.Nick, $"✅ Welcome back `{profile.Handle}`. Your session has been reactivated.");
                 SendToChannel("#ghostroot", $"🔌 Runner `{profile.Handle}` has reconnected to GhostRoot.");
+                var node = networkMap.GetNode(profile.CurrentNode) ?? networkMap.GetNode("root");
+                HandleLook(profile, node, "", true);
                 Log($"Reactivated previous enrollment for {user.Nick}");
             }
             else
@@ -145,28 +166,59 @@ namespace BotScripts
             var cmd = parts[0].ToLowerInvariant();
             var args = parts.Length > 1 ? parts[1] : "";
 
-            Log($"Handling command '{cmd}' from {nick}");
-
-            switch (cmd)
+            var node = networkMap.GetNode(profile.CurrentNode) ?? networkMap.GetNode("root");
+            if (CommandHandlers.TryGetValue(cmd, out var handler))
             {
-                case "status":
-                    var msg = $"🧠 {profile.Handle} | Level {profile.Level} | XP {profile.XP} | Node: {profile.CurrentNode}";
-                    if (isPrivate) SendPM(nick, msg);
-                    else SendToChannel("#ghostroot", msg);
-                    break;
-
-                case "look":
-                    SendPM(nick, "👁️ You scan your surroundings... (room system coming soon)");
-                    break;
-
-                case "go":
-                    SendPM(nick, $"🧭 You try to move: `{args}` — but the pathways aren't open yet.");
-                    break;
-
-                default:
-                    SendPM(nick, $"❓ Unknown command: `{cmd}`.");
-                    break;
+                handler(profile, node, args, isPrivate);
             }
+            else
+            {
+                // Unknown command: suggest valid actions/exits for this node
+                var options = new List<string>(node.Actions.Select(a => $"!{a}"));
+                options.AddRange(node.Exits.Keys.Select(e => $"!go {e}"));
+                SendPM(profile.Nick, $"Unknown command. Options here: {string.Join(", ", options)}");
+            }
+        }
+
+        // === HANDLER FUNCTIONS BELOW ===
+
+        private void HandleStatus(PlayerProfile profile, Node node, string args, bool isPrivate)
+        {
+            var msg = $"🧠 {profile.Handle} | Level {profile.Level} | XP {profile.XP} | Node: {profile.CurrentNode}";
+            if (isPrivate) SendPM(profile.Nick, msg);
+            else SendToChannel("#ghostroot", msg);
+        }
+
+        private void HandleLook(PlayerProfile profile, Node node, string args, bool isPrivate)
+        {
+            var msg = $"{node.Name}\n{node.Description}\nExits: {string.Join(", ", node.Exits.Keys)}";
+            SendPM(profile.Nick, msg);
+            // Optionally, list available actions at this node
+            if (node.Actions.Any())
+                SendPM(profile.Nick, $"Available actions: {string.Join(", ", node.Actions.Select(a => $"!{a}"))}");
+        }
+
+        private void HandleGo(PlayerProfile profile, Node node, string args, bool isPrivate)
+        {
+            if (string.IsNullOrWhiteSpace(args))
+            {
+                SendPM(profile.Nick, "Specify a direction or exit. Example: !go scan");
+                return;
+            }
+            if (!node.Exits.TryGetValue(args.ToLowerInvariant(), out var nextNodeId))
+            {
+                SendPM(profile.Nick, $"Invalid path. Options: {string.Join(", ", node.Exits.Keys)}");
+                return;
+            }
+            var nextNode = networkMap.GetNode(nextNodeId);
+            if (nextNode == null)
+            {
+                SendPM(profile.Nick, "Path leads to nowhere. Contact an admin.");
+                return;
+            }
+            profile.CurrentNode = nextNode.Id;
+            playerService.Save(profile);
+            HandleLook(profile, nextNode, "", true); // Auto-look after move!
         }
     }
 }

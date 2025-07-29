@@ -44,6 +44,16 @@
         <div class="dock-icon" title="IRC Log" @onclick="ToggleLogWindow">
             <span class="oi oi-terminal"></span>
         </div>
+        <div class="dock-icon" title="System Notices" @onclick="ToggleSystemWindow">
+            <span class="oi oi-bell"></span>
+            @{
+                var systemChannel = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == "*system");
+                if (systemChannel != null && systemChannel.HasUnread)
+                {
+                    <span class="badge">@systemChannel.UnreadCount</span>
+                }
+            }
+        </div>
         <div class="dock-icon" title="Alert Manager" @onclick="ToggleAlertManagerWindow">
             🔔
         </div>
@@ -72,25 +82,26 @@
         EventBus.Unsubscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
         EventBus.Unsubscribe<RequestPrivateMessageEvent>(HandlePmRequest);
         EventBus.Unsubscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
-        EventBus.Unsubscribe<ChannelMessageReceivedEvent>((evt) =>
-            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content));
-
-        EventBus.Unsubscribe<UserJoinedEvent>((evt) =>
-            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel));
+        EventBus.Unsubscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
+        EventBus.Unsubscribe<UserJoinedEvent>(HandleUserJoined);
 
 
         // --- SINGLE handler per event ---
         EventBus.Subscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
         EventBus.Subscribe<RequestPrivateMessageEvent>(HandlePmRequest);
         EventBus.Subscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
-
-        EventBus.Subscribe<ChannelMessageReceivedEvent>((evt) =>
-            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content));
-
-        EventBus.Subscribe<UserJoinedEvent>((evt) =>
-            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel));
+        EventBus.Subscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
+        EventBus.Subscribe<UserJoinedEvent>(HandleUserJoined);
+    }
+    private void HandleChannelMessage(ChannelMessageReceivedEvent evt)
+    {
+        TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content);
     }
 
+    private void HandleUserJoined(UserJoinedEvent evt)
+    {
+        TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel);
+    }
     private void HandlePrivateMessage(PrivateMessageReceivedEvent evt)
     {
         var user = evt.Sender;
@@ -101,6 +112,9 @@
         {
             convo = new PrivateConversation(user);
             PMs.Add(convo);
+            OpenPrivateMessageWindow(convo);
+        } else
+        {
             OpenPrivateMessageWindow(convo);
         }
 
@@ -271,6 +285,43 @@
             OpenWindows.Add(window);
         }
     }
+    private void ToggleSystemWindow()
+    {
+        var title = "*system";
+        var systemChannel = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == title);
+
+        if (systemChannel == null)
+        {
+            systemChannel = new IrcChannel { Name = title, IsJoined = true };
+            Common.ircClient.JoinedChannels.Add(systemChannel);
+        }
+
+        // Check if window already open
+        var existing = OpenWindows.FirstOrDefault(w => w.Title == title);
+        if (existing != null)
+        {
+            OpenWindows.Remove(existing);
+            return;
+        }
+
+        var window = new Window
+        {
+            Title = title,
+            Type = WindowType.Channel, // Treat it like a channel window for simplicity
+        };
+        window.ChildContent = builder =>
+        {
+            builder.OpenComponent(0, typeof(ChatWindow));
+            builder.AddAttribute(1, "Channel", systemChannel);
+            builder.AddAttribute(2, "OnClose", EventCallback.Factory.Create(this, () =>
+            {
+                HandleWindowClose(window);
+            }));
+            builder.CloseComponent();
+        };
+
+        OpenWindows.Add(window);
+    }
 
     private void UpdateWindowPosition(Window window, (int Top, int Left) pos)
     {
@@ -439,14 +490,10 @@
 
     public void Dispose()
     {
-        //This is probably pointless, becuase if you leave this page the whole app is done anyway. oh well 
         EventBus.Unsubscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
         EventBus.Unsubscribe<RequestPrivateMessageEvent>(HandlePmRequest);
         EventBus.Unsubscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
-        EventBus.Unsubscribe<ChannelMessageReceivedEvent>((evt) =>
-            TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content));
-
-        EventBus.Unsubscribe<UserJoinedEvent>((evt) =>
-            TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel));
+        EventBus.Unsubscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
+        EventBus.Unsubscribe<UserJoinedEvent>(HandleUserJoined);
     }
 }

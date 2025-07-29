@@ -1,5 +1,6 @@
 ﻿using BotCore.Interfaces;
 using LoboForge.TNOIRC.Shared.Models;
+using System.Security.AccessControl;
 
 namespace LoboForge.TNOIRC.BotCore.Models
 {

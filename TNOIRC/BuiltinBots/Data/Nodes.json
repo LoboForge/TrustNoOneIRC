@@ -1,0 +1,19 @@
+[
+  {
+    "Id": "root",
+    "Name": "Root Node",
+    "Description": "You are in the root of the network. It feels cold, but stable.",
+    "Exits": { "scan": "firewall" },
+    "Actions": [ "status", "look" ]
+  },
+  {
+    "Id": "firewall",
+    "Name": "Firewall Perimeter",
+    "Description": "A glowing wall of data blocks your path. Ports flicker in and out.",
+    "Exits": {
+      "back": "root",
+      "bypass": "internal"
+    },
+    "Actions": [ "probe" ]
+  }
+]

@@ -103,10 +103,75 @@ namespace LoboForge.TNOIRC.Commands
             }
             else
             {
+                // Add join message to channel
+                var chan = Common.ircClient.JoinedChannels
+                    .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
+                if (chan != null)
+                {
+                    var joinMsg = new ChatMessage(
+                        DateTime.UtcNow,
+                        user,
+                        channel,
+                        $"{user.Nick} has joined the channel.",
+                        isAction: false)
+                    {
+                        IsNotice = true
+                    };
+                    chan.Messages.Add(joinMsg);
+                    EventBus.Publish(new ChannelMessageReceivedEvent(user, channel, joinMsg.Content, false));
+                }
+
                 EventBus.Publish(new UserJoinedEvent(user, channel));
             }
         }
+    }
 
+    public class NoticeHandler : IIrcCommandHandler
+    {
+        public bool CanHandle(string command) => command == "NOTICE";
+
+        public void Handle(IrcMessage message)
+        {
+            if (message.Prefix == null || message.Parameters.Count < 1 || message.Trailing == null)
+                return;
+
+            var sender = IrcUser.FromPrefix(message.Prefix);
+            var target = message.Parameters[0];
+            var content = message.Trailing;
+
+            // Add notice as a ChatMessage to channel or DM
+            if (target.StartsWith('#') || target.StartsWith('&'))
+            {
+                var channel = Common.ircClient.JoinedChannels
+                    .FirstOrDefault(c => string.Equals(c.Name, target, StringComparison.OrdinalIgnoreCase));
+                if (channel != null)
+                {
+                    var noticeMsg = new ChatMessage(DateTime.UtcNow, sender, target, content, false)
+                    {
+                        IsNotice = true
+                    };
+                    channel.Messages.Add(noticeMsg);
+                    EventBus.Publish(new ChannelMessageReceivedEvent(sender, target, content, false));
+                }
+            }
+            else
+            {
+                // Add notice as a message to a "system" channel for direct notices
+                var systemChannel = Common.ircClient.JoinedChannels
+                    .FirstOrDefault(c => c.Name == "*system");
+                if (systemChannel == null)
+                {
+                    systemChannel = new IrcChannel { Name = "*system", IsJoined = true };
+                    Common.ircClient.JoinedChannels.Add(systemChannel);
+                }
+                var noticeMsg = new ChatMessage(DateTime.UtcNow, sender, "*system", content, false)
+                {
+                    IsNotice = true
+                };
+                systemChannel.Messages.Add(noticeMsg);
+                EventBus.Publish(new ChannelMessageReceivedEvent(sender, "*system", content, false));
+            }
+        }
     }
 
 
@@ -123,9 +188,30 @@ namespace LoboForge.TNOIRC.Commands
             var channel = message.Parameters[0];
             var reason = message.Trailing ?? "";
 
+            // Add part message to channel
+            var chan = Common.ircClient.JoinedChannels
+                .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
+            if (chan != null)
+            {
+                var partMsg = new ChatMessage(
+                    DateTime.UtcNow,
+                    user,
+                    channel,
+                    string.IsNullOrWhiteSpace(reason)
+                        ? $"{user.Nick} has left the channel."
+                        : $"{user.Nick} has left the channel: {reason}",
+                    isAction: false)
+                {
+                    IsNotice = true
+                };
+                chan.Messages.Add(partMsg);
+                EventBus.Publish(new ChannelMessageReceivedEvent(user, channel, partMsg.Content, false));
+            }
+
             EventBus.Publish(new UserPartedEvent(user, channel, reason));
         }
     }
+
 
     public class NameReplyHandler : IIrcCommandHandler
     {
@@ -269,9 +355,29 @@ namespace LoboForge.TNOIRC.Commands
             var user = IrcUser.FromPrefix(message.Prefix);
             var reason = message.Trailing;
 
+            // Add quit message to all channels where user was present
+            foreach (var chan in Common.ircClient.JoinedChannels)
+            {
+                if (chan.Users.Any(u => u.Nick == user.Nick))
+                {
+                    var quitMsg = new ChatMessage(
+                        DateTime.UtcNow,
+                        user,
+                        chan.Name,
+                        $"{user.Nick} has quit IRC: {reason}",
+                        isAction: false)
+                    {
+                        IsNotice = true
+                    };
+                    chan.Messages.Add(quitMsg);
+                    EventBus.Publish(new ChannelMessageReceivedEvent(user, chan.Name, quitMsg.Content, false));
+                }
+            }
+
             EventBus.Publish(new UserQuitEvent(user, reason));
         }
     }
+
     public class NickHandler : IIrcCommandHandler
     {
         public bool CanHandle(string command) => command == "NICK";
@@ -287,22 +393,7 @@ namespace LoboForge.TNOIRC.Commands
             EventBus.Publish(new UserNickChangedEvent(oldUser, newNick));
         }
     }
-    public class NoticeHandler : IIrcCommandHandler
-    {
-        public bool CanHandle(string command) => command == "NOTICE";
 
-        public void Handle(IrcMessage message)
-        {
-            if (message.Prefix == null || message.Parameters.Count < 1 || message.Trailing == null)
-                return;
-
-            var sender = IrcUser.FromPrefix(message.Prefix);
-            var target = message.Parameters[0];
-            var content = message.Trailing;
-
-            EventBus.Publish(new NoticeReceivedEvent(sender, target, content));
-        }
-    }
     public class ModeHandler : IIrcCommandHandler
     {
         public bool CanHandle(string command) => command == "MODE";
@@ -376,9 +467,30 @@ namespace LoboForge.TNOIRC.Commands
             var kickedUser = message.Parameters[1];
             var reason = message.Trailing ?? "";
 
+            // Add kick message to channel
+            var chan = Common.ircClient.JoinedChannels
+                .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
+            if (chan != null)
+            {
+                var kickMsg = new ChatMessage(
+                    DateTime.UtcNow,
+                    kicker,
+                    channel,
+                    string.IsNullOrWhiteSpace(reason)
+                        ? $"{kickedUser} was kicked by {kicker.Nick}."
+                        : $"{kickedUser} was kicked by {kicker.Nick}: {reason}",
+                    isAction: false)
+                {
+                    IsNotice = true
+                };
+                chan.Messages.Add(kickMsg);
+                EventBus.Publish(new ChannelMessageReceivedEvent(kicker, channel, kickMsg.Content, false));
+            }
+
             EventBus.Publish(new KickedFromChannelEvent(kicker, channel, kickedUser, reason));
         }
     }
+
 
 
 }

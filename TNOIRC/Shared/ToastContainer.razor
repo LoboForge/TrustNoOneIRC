@@ -1,11 +1,18 @@
 ﻿@inject ToastService ToastService
 
 <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
-    @foreach (var toast in toasts)
+    @try {
+    foreach (var toast in toasts)
     {
+        
         <div class="toast show mb-2 alert alert-@toast.Level.ToString().ToLower()">
             @toast.Message
-        </div>
+            </div>
+        }
+    } catch (Exception)
+    {
+        
+    
     }
 </div>
 
@@ -21,7 +28,7 @@
     {
         toasts.Add(toast);
         InvokeAsync(StateHasChanged);
-        await Task.Delay(5000);
+        await Task.Delay(8000);
         toasts.Remove(toast);
         InvokeAsync(StateHasChanged);
     }

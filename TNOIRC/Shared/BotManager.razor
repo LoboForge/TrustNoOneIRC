@@ -1,8 +1,7 @@
-﻿@using LoboForge.TNOIRC
-@using LoboForge.TNOIRC.Services
-@using LoboForge.TNOIRC.BotEngine
+﻿@using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared.Models
 @using global::BotCore.Interfaces
+@using LoboForge.TNOIRC.BotEngine
 @implements IDisposable
 
 <div class="container mt-3">
@@ -19,8 +18,10 @@
         <thead>
             <tr>
                 <th>Name</th>
+                <th>Type</th>
                 <th>Status</th>
                 <th>Actions</th>
+                <th>Logs</th>
             </tr>
         </thead>
         <tbody>
@@ -28,10 +29,25 @@
             {
                 <tr>
                     <td>@bot.Name</td>
+                    <td>@bot.SourceType</td>
                     <td>@(bot.Enabled ? "✅ Enabled" : "❌ Disabled")</td>
                     <td>
-                        <button class="btn btn-sm btn-success me-2" @onclick="() => EnableBot(bot)" disabled="@bot.Enabled">Enable</button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => DisableBot(bot)" disabled="@(!bot.Enabled)">Disable</button>
+                        <button class="btn btn-sm btn-success me-2"
+                                @onclick="() => StartBot(bot)"
+                                disabled="@bot.Enabled">
+                            Start
+                        </button>
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => StopBot(bot)"
+                                disabled="@(!bot.Enabled)">
+                            Stop
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary"
+                                @onclick="() => ShowLogsForBot(bot)">
+                            Logs
+                        </button>
                     </td>
                 </tr>
             }
@@ -50,56 +66,92 @@
             </ul>
         </div>
     }
-    <div>
-        @foreach(var bot in Bots)
-        {
-            <button @onclick="()=>{ SelectedBot = bot; }">@bot.Name</button>
-        }
-        @if (SelectedBot?.Instance is LoboForge.TNOIRC.BotCore.Models.BotBase baseBot)
-        {
-            <div style="max-height: 300px; overflow-y: auto; background-color: #111; padding: 1rem; color: #ffcc00; font-family: monospace;">
-                <strong>Bot Logs:</strong>
-                <ul>
-                    @foreach (var log in baseBot.Logs)
+
+    @if (SelectedBotForLogs != null)
+    {
+        <div style="max-height: 350px; overflow-y: auto; background-color: #111; padding: 1rem; color: #ffcc00; font-family: monospace; margin-bottom: 2rem;">
+            <strong>@SelectedBotForLogs.Name Bot Logs:</strong>
+            <ul>
+                @if ((SelectedBotForLogs.Instance as LoboForge.TNOIRC.BotCore.Models.BotBase)?.Logs?.Any() == true)
+                {
+                    @foreach (var log in ((LoboForge.TNOIRC.BotCore.Models.BotBase)SelectedBotForLogs.Instance).Logs)
                     {
                         <li>@log</li>
                     }
-                </ul>
-            </div>
-        }
-    </div>
+                }
+                else
+                {
+                    <li>No logs yet.</li>
+                }
+            </ul>
+            <button class="btn btn-sm btn-outline-warning mt-2" @onclick="() => SelectedBotForLogs = null">Close Logs</button>
+        </div>
+    }
 </div>
 
 @code {
     private List<IBotMetadata> Bots = new();
     private List<string> Errors = new();
     private PluginService PluginService = new();
-    private IBotMetadata SelectedBot;
+    private IBotMetadata? SelectedBotForLogs;
+    private string BotFolderOverride = "D:\\Development\\TrustNoOneIRC\\GhostRootBot";
+    private bool eventsSubscribed = false;
 
     protected override void OnInitialized()
     {
         LoadBots();
-        SelectedBot = Bots.FirstOrDefault();
     }
-
-    private string BotFolderOverride = "D:\\Development\\TrustNoOneIRC\\GhostRootBot";
 
     private void LoadBots()
     {
-        (Bots, Errors) = PluginService.ReloadBots(BotFolderOverride);
+        // Load both types
+        var codBots = PluginService.ReloadBots(BotFolderOverride);
+        var dllBots = PluginService.ReloadBots();
+
+        // Optionally: avoid duplicates (e.g. if you have same bot name/type in both)
+        var allBots = codBots.Bots.Concat(dllBots.Bots)
+            .GroupBy(b => b.Name)
+            .Select(g => g.First())
+            .ToList();
+        allBots.AddRange(BotService.BotsMeta);
+        Bots = allBots;
+        Errors = codBots.Errors.Concat(dllBots.Errors).ToList();
+        SelectedBotForLogs = null;
+        SubscribeBotEvents();
         StateHasChanged();
     }
 
+    private void ReloadBots() => LoadBots();
 
-    private void ReloadBots()
+    private void StartBot(IBotMetadata bot)
     {
-        LoadBots();
+        if (!bot.Enabled)
+        {
+            bot.Enabled = true;
+            bot.Instance?.OnStart();
+        }
     }
 
-    private void EnableBot(IBotMetadata bot)
+    private void StopBot(IBotMetadata bot)
     {
-        bot.Enabled = true;
-        PluginService.ApplyBotState(bot);
+        if (bot.Enabled)
+        {
+            bot.Enabled = false;
+            bot.Instance?.OnStop();
+        }
+    }
+
+    private void ShowLogsForBot(IBotMetadata bot)
+    {
+        SelectedBotForLogs = bot;
+        StateHasChanged();
+    }
+
+    private void SubscribeBotEvents()
+    {
+        if (eventsSubscribed) return;
+        eventsSubscribed = true;
+
         EventBus.Subscribe<BotPrivateMessageEvent>(evt =>
         {
             Common.ircClient.SendRawAsync($"PRIVMSG {evt.Nick} :{evt.Message}");
@@ -108,25 +160,10 @@
         {
             Common.ircClient.SendRawAsync($"PRIVMSG {evt.Channel} :{evt.Message}");
         });
-
-    }
-
-    private void DisableBot(IBotMetadata bot)
-    {
-        bot.Enabled = false;
-        PluginService.ApplyBotState(bot);
-        EventBus.Unsubscribe<BotPrivateMessageEvent>(evt =>
-        {
-            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Nick} :{evt.Message}");
-        });
-        EventBus.Unsubscribe<BotSendChannelMessageEvent>(evt =>
-        {
-            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Channel} :{evt.Message}");
-        });
     }
 
     public void Dispose()
     {
-        // cleanup logic if needed
+        // TODO: Add EventBus.Unsubscribe if you store the delegates for removal
     }
 }

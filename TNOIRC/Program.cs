@@ -1,11 +1,12 @@
+using BotScripts;
 using ElectronNET.API;
 using ElectronNET.API.Entities;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Http.Connections;
 using LoboForge.TNOIRC;
 using LoboForge.TNOIRC.Data;
 using LoboForge.TNOIRC.Services;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Http.Connections;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -44,6 +45,7 @@ Common.ircClient = new IrcClientService(
     dispatcher: Common.Dispatcher
 );
 ConfigService.Load();
+//BotService.LoadBots();
 // Start Electron app and create window
 if (HybridSupport.IsElectronActive)
 {

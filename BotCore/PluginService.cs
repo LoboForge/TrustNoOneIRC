@@ -15,6 +15,7 @@ namespace LoboForge.TNOIRC.BotEngine
 
         /// <summary>
         /// Reloads all bot scripts from the specified folder or the default /Bots directory.
+        /// Also discovers DLL-based bots (class libraries).
         /// </summary>
         /// <param name="folderOverride">Optional path to a bot folder. If null or empty, defaults to /Bots.</param>
         public (List<IBotMetadata> Bots, List<string> Errors) ReloadBots(string? folderOverride = null)
@@ -29,15 +30,14 @@ namespace LoboForge.TNOIRC.BotEngine
             if (!Directory.Exists(botPath))
                 Directory.CreateDirectory(botPath);
 
+            // ---- 1. Roslyn CODE-ON-DEMAND Bots (.cs) ----
             var compiler = new BotCompiler();
-            var types = compiler.CompileAll(botPath, out var assembly, out var compileErrors);
+            var codTypes = compiler.CompileAll(botPath, out var codAssembly, out var compileErrors);
 
             if (compileErrors.Any())
-            {
-                _errors.AddRange(compileErrors.Select(e => $"[Bots Compilation] {e}"));
-            }
+                _errors.AddRange(compileErrors.Select(e => $"[COD Compilation] {e}"));
 
-            foreach (var type in types)
+            foreach (var type in codTypes)
             {
                 try
                 {
@@ -50,22 +50,62 @@ namespace LoboForge.TNOIRC.BotEngine
                             Name = instance.Name,
                             Enabled = true,
                             Instance = instance,
-                            SourceAssembly = assembly!
+                            SourceAssembly = codAssembly!,
+                            SourceType = "COD"
                         };
-
                         _bots.Add(metadata);
-                        instance.OnStart(); // Auto-start on load
+                        instance.OnStart();
                     }
                 }
                 catch (Exception botEx)
                 {
-                    _errors.Add($"[Bots Compilation] Error initializing {type.Name}: {botEx.Message}");
+                    _errors.Add($"[COD Compilation] Error initializing {type.Name}: {botEx.Message}");
+                }
+            }
+
+            // ---- 2. DLL Bots ----
+            foreach (var dll in Directory.GetFiles(botPath, "*.dll", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    var assembly = Assembly.LoadFrom(dll);
+                    var botTypes = assembly.GetTypes()
+                        .Where(t => typeof(IBot).IsAssignableFrom(t) && t.IsClass && !t.IsAbstract);
+
+                    foreach (var type in botTypes)
+                    {
+                        try
+                        {
+                            RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+
+                            if (Activator.CreateInstance(type) is IBot instance)
+                            {
+                                var metadata = new BotMetadata
+                                {
+                                    Name = instance.Name,
+                                    Enabled = true,
+                                    Instance = instance,
+                                    SourceAssembly = assembly,
+                                    SourceType = "DLL"
+                                };
+                                _bots.Add(metadata);
+                                instance.OnStart();
+                            }
+                        }
+                        catch (Exception botEx)
+                        {
+                            _errors.Add($"[DLL Load] Error initializing {type.FullName}: {botEx.Message}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _errors.Add($"[DLL Load] Failed to load {dll}: {ex.Message}");
                 }
             }
 
             return (_bots.ToList(), _errors.ToList());
         }
-
 
         /// <summary>
         /// Enables or disables a bot instance based on its Enabled state.

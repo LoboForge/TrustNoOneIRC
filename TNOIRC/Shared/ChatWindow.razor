@@ -4,32 +4,33 @@
 
 @if (Channel is null)
 {
-
-        <div class="chat-window-content">No channel loaded.</div>
-
+    <div class="chat-window-content">No channel loaded.</div>
 }
 else
 {
-
-
-        <div class="chat-window-content d-flex flex-column">
-
-
-            <div class="flex-grow-1 d-flex overflow-hidden">
-                @if (ShowUserList)
-                {
-                    <div class="user-list border-end pe-2 me-2" style="width: 160px; overflow-y: auto;">
-                        @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
-                        {
-                            <div class="user-entry" @onclick="() => StartPm(user)">@user.Nick</div>
-                        }
-                    </div>
-                }
-
-                <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
-                    @foreach (var msg in Channel.Messages)
+    <div class="chat-window-content d-flex flex-column">
+        <div class="flex-grow-1 d-flex overflow-hidden">
+            @if (ShowUserList)
+            {
+                <div class="user-list border-end pe-2 me-2" style="width: 160px; overflow-y: auto;">
+                    @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
                     {
-                    @if (!msg.IsAction)
+                        <div class="user-entry" @onclick="() => StartPm(user)">@user.Nick</div>
+                    }
+                </div>
+            }
+
+            <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
+                @foreach (var msg in Channel.Messages)
+                {
+                    if (msg.IsNotice)
+                    {
+                        <div class="chat-message notice-msg">
+                            <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                            <span class="user notice">*** @msg.Content ***</span>
+                        </div>
+                    }
+                    else if (!msg.IsAction)
                     {
                         <div class="chat-message">
                             <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
@@ -38,7 +39,6 @@ else
                                 @foreach (var line in msg.Content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
                                 {
                                     @line
-                    
                                     <br />
                                 }
                             </span>
@@ -51,27 +51,23 @@ else
                             <span class="user" style="font-weight:bold;">** @msg.Sender.Nick @msg.Content **</span>
                         </div>
                     }
-
-                    }
-                </div>
+                }
             </div>
+        </div>
         <div style="position:absolute; bottom:50px; left:10px; width:90%; background-color:transparent;">
-            
+
             <button @onclick="ToggleUserList">👥</button>
         </div>
-            <div class="chat-input mt-1">
+        <div class="chat-input mt-1">
             <input type="text"
                    @bind-value="CurrentMessage"
                    @bind-value:event="oninput"
                    @onkeydown="HandleKey"
                    placeholder="Type your message..." />
-                <button @onclick="SendMessage">Send</button>
-            </div>
+            <button @onclick="SendMessage">Send</button>
         </div>
-    
+    </div>
 }
-
-
 
 @code {
     [Parameter] public IrcChannel Channel { get; set; } = default!;
@@ -84,17 +80,26 @@ else
     private string CurrentMessage = "";
     private ElementReference MessagesDiv;
     private bool ShowUserList = true;
-
-
     protected override void OnInitialized()
     {
         base.OnInitialized();
         EventBus.Subscribe<ChannelMessageReceivedEvent>(HandleNewMessage);
+        EventBus.Subscribe<UserJoinedEvent>(HandleUserJoined);
     }
+
+    private async void HandleUserJoined(UserJoinedEvent evt)
+    {
+        await InvokeAsync(async () =>
+        {
+            StateHasChanged();
+        });
+    }
+
     private void StartPm(IrcUser user)
     {
         EventBus.Publish(new RequestPrivateMessageEvent(user));
     }
+
     private void ToggleUserList()
     {
         ShowUserList = !ShowUserList;
@@ -140,9 +145,8 @@ else
 
     private async Task ScrollToBottom()
     {
-         await InvokeAsync(()=>  JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv));
+        await InvokeAsync(() => JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv));
     }
-
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
 }
