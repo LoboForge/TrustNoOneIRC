@@ -1,0 +1,248 @@
+﻿@using CTFHackTools
+@using System.Globalization
+
+<div class="container mt-4" style="max-width: 600px;">
+    <h4>CTF Hacker Tools</h4>
+
+    <div class="card p-3 mb-3">
+        <h5>Offset Between Two Addresses</h5>
+        <div class="row g-2 align-items-end">
+            <div class="col">
+                <label class="form-label">Address 1 (hex):</label>
+                <input class="form-control" @bind="Address1" placeholder="e.g. 0x1234" />
+            </div>
+            <div class="col">
+                <label class="form-label">Address 2 (hex):</label>
+                <input class="form-control" @bind="Address2" placeholder="e.g. 0x1120" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary" @onclick="ComputeOffset">Compute</button>
+            </div>
+        </div>
+        @if (Offset.HasValue)
+        {
+            <div class="mt-2">
+                <strong>Offset:</strong>
+                <span style="font-family:monospace;">
+                    @Offset.Value  <!-- This will show negative values correctly -->
+                    @(Offset.Value < 0 ? "-" : "")
+                    hex: @("0x"+@Math.Abs(Offset.Value).ToString("X"))
+                </span>
+            </div>
+        }
+    </div>
+
+    <div class="card p-3 mb-3">
+        <h5>Add Offset to Address</h5>
+        <div class="row g-2 align-items-end">
+            <div class="col">
+                <label class="form-label">Base Address (hex):</label>
+                <input class="form-control" @bind="BaseAddress" placeholder="e.g. 0x556e12345000" />
+            </div>
+            <div class="col">
+                <label class="form-label">Offset (decimal):</label>
+                <input type="number" class="form-control" @bind="OffsetToAdd" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-primary" @onclick="ComputeNewAddress">Compute</button>
+            </div>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(NewAddress))
+        {
+            <div class="mt-2">
+                <strong>Result:</strong>
+                <span style="font-family:monospace;">@NewAddress</span>
+                <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="CopyToClipboard">Copy</button>
+                @if (CopyResult != null)
+                {
+                    <span class="text-success ms-2">@CopyResult</span>
+                }
+            </div>
+        }
+    </div>
+    <div class="card p-3 mb-3">
+        <h5>URL Decode</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="UrlInput" placeholder="Paste URL-encoded string" />
+            <button class="btn btn-outline-primary" @onclick="DoUrlDecode">Decode</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(UrlDecoded))
+        {
+            <div class="mt-2">
+                <strong>Decoded:</strong>
+                <span style="font-family:monospace;">@UrlDecoded</span>
+            </div>
+        }
+    </div>
+
+    <div class="card p-3 mb-3">
+        <h5>Base64 Decode</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="Base64Input" placeholder="Paste Base64 string" />
+            <button class="btn btn-outline-primary" @onclick="DoBase64Decode">Decode</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Base64Decoded))
+        {
+            <div class="mt-2">
+                <strong>Decoded:</strong>
+                <span style="font-family:monospace;">@Base64Decoded</span>
+            </div>
+        }
+    </div>
+    <div class="card p-3 mb-3">
+        <h5>ROT13 Encode/Decode</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="Rot13Input" placeholder="Type or paste text..." />
+            <button class="btn btn-outline-primary" @onclick="DoRot13">Convert</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Rot13Result))
+        {
+            <div class="mt-2">
+                <strong>Result:</strong>
+                <span style="font-family:monospace;">@Rot13Result</span>
+            </div>
+        }
+    </div>
+    <div class="card p-3 mb-3">
+        <h5>Hex to Decimal</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="HexInput" placeholder="Enter hex (e.g., 2a or 0x2a)" />
+            <button class="btn btn-outline-primary" @onclick="DoHexToDecimal">Convert</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(HexToDecimalResult))
+        {
+            <div class="mt-2">
+                <strong>Decimal:</strong>
+                <span style="font-family:monospace;">@HexToDecimalResult</span>
+            </div>
+        }
+    </div>
+
+</div>
+
+@code {
+    // Address offset tool
+    private string Address1 { get; set; } = "";
+    private string Address2 { get; set; } = "";
+    private long? Offset { get; set; }
+
+    // Add offset tool
+    private string BaseAddress { get; set; } = "";
+    private int OffsetToAdd { get; set; }
+    private string NewAddress { get; set; } = "";
+    private string? CopyResult;
+    // URL decode
+    private string UrlInput { get; set; } = "";
+    private string UrlDecoded { get; set; } = "";
+
+
+    // Base64 decode
+    private string Base64Input { get; set; } = "";
+    private string Base64Decoded { get; set; } = "";
+
+    //ROT 13
+    private string Rot13Input { get; set; } = "";
+    private string Rot13Result { get; set; } = "";
+
+    //HEX to Decimal
+    private string HexInput { get; set; } = "";
+    private string HexToDecimalResult { get; set; } = "";
+
+
+    private void DoUrlDecode()
+    {
+        try
+        {
+            UrlDecoded = CTFTools.UrlDecode(UrlInput);
+        }
+        catch
+        {
+            UrlDecoded = "[Error decoding URL]";
+        }
+    }
+    private void DoHexToDecimal()
+    {
+        HexToDecimalResult = "";
+        if (!string.IsNullOrWhiteSpace(HexInput))
+        {
+            string cleaned = HexInput.Trim().ToLower().Replace("0x", "");
+            try
+            {
+                long dec = Convert.ToInt64(cleaned, 16);
+                HexToDecimalResult = dec.ToString();
+            }
+            catch
+            {
+                HexToDecimalResult = "Invalid hex input";
+            }
+        }
+    }
+    private void DoRot13()
+    {
+        Rot13Result = string.IsNullOrEmpty(Rot13Input)
+            ? ""
+            : new string(Rot13Input.Select(ch =>
+            {
+                if ('a' <= ch && ch <= 'z')
+                    return (char)('a' + (ch - 'a' + 13) % 26);
+                if ('A' <= ch && ch <= 'Z')
+                    return (char)('A' + (ch - 'A' + 13) % 26);
+                return ch;
+            }).ToArray());
+    }
+    private void ComputeOffset()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(Address1) && !string.IsNullOrWhiteSpace(Address2))
+            {
+                Offset = CTFTools.GetOffset(Address1, Address2);
+            }
+            else Offset = null;
+        }
+        catch (Exception ex)
+        {
+            Offset = null;
+            // Optional: log error
+        }
+    }
+
+    private void ComputeNewAddress()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(BaseAddress))
+            {
+                NewAddress = CTFTools.AddOffset(BaseAddress, OffsetToAdd);
+            }
+            else NewAddress = "";
+        }
+        catch (Exception ex)
+        {
+            NewAddress = "";
+            // Optional: log error
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", NewAddress);
+        CopyResult = "Copied!";
+        await Task.Delay(1500);
+        CopyResult = null;
+    }
+
+    private void DoBase64Decode()
+    {
+        try
+        {
+            Base64Decoded = CTFTools.Base64Decode(Base64Input);
+        }
+        catch
+        {
+            Base64Decoded = "[Error decoding Base64]";
+        }
+    }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+}

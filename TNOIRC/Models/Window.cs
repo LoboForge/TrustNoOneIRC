@@ -26,6 +26,9 @@ namespace LoboForge.TNOIRC.Models
         Commands,
         AutoReply,
         BotManager,
-        AlertManager
+        AlertManager,
+        CTF,
+        ImageTools,
+        IpWhois
     }
 }

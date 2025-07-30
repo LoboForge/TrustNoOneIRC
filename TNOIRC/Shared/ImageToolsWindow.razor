@@ -1,0 +1,134 @@
+﻿@using CTFHackTools
+@using System.Globalization
+@using LoboForge.TNOIRC.Services
+
+<div class="container mt-4">
+    <h4>Image Tools</h4>
+
+    <div class="card p-12 mb-12">
+        <h5>Decode QR Code from Image (by Path)</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="QrFilePath" placeholder="Enter full image file path (e.g. C:\Users\You\qr.png)" />
+            <button class="btn btn-outline-primary" @onclick="DoQrDecode">Decode</button>
+        </div>
+        @if (!string.IsNullOrEmpty(QrDecodeResult))
+        {
+            <div class="mt-2">
+                <strong>Decoded QR:</strong>
+                <span style="font-family:monospace;">@QrDecodeResult</span>
+            </div>
+        }
+    </div>
+    <div class="card p-12 mb-12">
+        <h5>Extract LSB (All Channels) from Image</h5>
+        <div class="input-group">
+            <input class="form-control" @bind="LsbFilePath" placeholder="Enter full image file path (e.g. C:\Users\You\red.png)" />
+            <button class="btn btn-outline-danger" @onclick="DoLsbExtract">Extract LSB</button>
+        </div>
+        @if (!string.IsNullOrEmpty(LsbExtractResult))
+        {
+            <div class="mt-2">
+                <strong>Extracted LSB Data:</strong>
+                <div>
+                    @if (!string.IsNullOrEmpty(DecodedLsbResult))
+                    {
+                        <div class="alert alert-success" style="font-family:monospace;">
+                            <strong>Auto-decoded:</strong><br />@DecodedLsbResult
+                        </div>
+                    }
+                    <details>
+                        <summary style="cursor:pointer;">Show Raw Extracted Data</summary>
+                        <div style="white-space: pre-wrap; font-family:monospace; word-break:break-all;">
+                            @if (LsbRawIsRepetitive)
+                            {
+                                <span>@LsbRawFirstBlock</span>
+                                <div style="color:#888;">[Repeated @LsbRawRepeatCount times]</div>
+                            }
+                            else
+                            {
+                                <span>@LsbExtractResult</span>
+                            }
+                        </div>
+                    </details>
+                </div>
+            </div>
+        }
+    </div>
+
+
+
+</div>
+
+@code {
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    private string LsbFilePath { get; set; } = "";
+    private string? LsbExtractResult;
+    private string? DecodedLsbResult;
+    private bool LsbRawIsRepetitive = false;
+    private string? LsbRawFirstBlock;
+    private int LsbRawRepeatCount = 0;
+    // For the QR card
+    private string QrFilePath { get; set; } = "";
+    private string? QrDecodeResult;
+    // If your ImageTools is a singleton or static class, update as needed
+    private ImageTools ImageTools = new();
+
+    private void DoQrDecode()
+    {
+        QrDecodeResult = string.IsNullOrWhiteSpace(QrFilePath)
+            ? "Please enter a file path."
+            : ImageTools.DecodeQrFromFile(QrFilePath) ?? "No QR code found.";
+    }
+
+    private void DoLsbExtract()
+    {
+        LsbExtractResult = string.IsNullOrWhiteSpace(LsbFilePath)
+            ? "Please enter a file path."
+            : ImageTools.ExtractLsbAllChannels(LsbFilePath) ?? "No LSB data found or decode failed.";
+
+        // Auto-detect base64 and decode using CTFTools
+        DecodedLsbResult = null;
+        string? foundB64;
+        DecodedLsbResult = CTFTools.TryAutoDecodeBase64(LsbExtractResult, out foundB64);
+
+        // Auto-collapse if data is highly repetitive
+        DetectRepeating(LsbExtractResult);
+    }
+
+    // Helper to detect repetition and show just the first unique block and repeat count
+    private void DetectRepeating(string? input)
+    {
+        LsbRawIsRepetitive = false;
+        LsbRawFirstBlock = null;
+        LsbRawRepeatCount = 0;
+
+        if (string.IsNullOrEmpty(input) || input.Length < 16)
+            return;
+
+        // Use the first block as a template (up to 32 chars)
+        int blockSize = Math.Min(32, input.Length / 2);
+        string block = input.Substring(0, blockSize);
+
+        int idx = 0, count = 0;
+        while (idx + blockSize <= input.Length)
+        {
+            string nextBlock = input.Substring(idx, blockSize);
+            if (nextBlock == block)
+                count++;
+            else
+                break;
+            idx += blockSize;
+        }
+
+        // If block repeats at least 3 times and covers >60% of input, treat as repetitive
+        if (count >= 3 && (count * blockSize > input.Length * 0.6))
+        {
+            LsbRawIsRepetitive = true;
+            LsbRawFirstBlock = block;
+            LsbRawRepeatCount = count;
+        }
+    }
+
+
+}
+

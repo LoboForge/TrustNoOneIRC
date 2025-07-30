@@ -157,3 +157,14 @@ public record PingReceivedEvent(string Token);
 public record KickedFromChannelEvent(IrcUser kicker, string channel, string kickedUser, string reason);
 public record ChannelMessageReceivedEvent(IrcUser Sender, string Target, string Content,  bool IsAction);
 public record PrivateMessageReceivedEvent(IrcUser Sender, ChatMessage Message, bool IsAction);
+
+public record UserIpLookupRequestedEvent
+{
+    public IrcUser User { get; }
+    public string ChannelName { get; }
+    public UserIpLookupRequestedEvent(IrcUser user, string channelName)
+    {
+        User = user;
+        ChannelName = channelName;
+    }
+}

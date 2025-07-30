@@ -103,11 +103,14 @@ namespace LoboForge.TNOIRC.Commands
             }
             else
             {
-                // Add join message to channel
                 var chan = Common.ircClient.JoinedChannels
                     .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
                 if (chan != null)
                 {
+                    // Add to user list if not already present
+                    if (!chan.Users.Any(u => u.Nick == user.Nick))
+                        chan.Users.Add(user);
+
                     var joinMsg = new ChatMessage(
                         DateTime.UtcNow,
                         user,
@@ -120,9 +123,9 @@ namespace LoboForge.TNOIRC.Commands
                     chan.Messages.Add(joinMsg);
                     EventBus.Publish(new ChannelMessageReceivedEvent(user, channel, joinMsg.Content, false));
                 }
-
                 EventBus.Publish(new UserJoinedEvent(user, channel));
             }
+
         }
     }
 
@@ -193,6 +196,9 @@ namespace LoboForge.TNOIRC.Commands
                 .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
             if (chan != null)
             {
+                // Remove from user list
+                chan.Users.RemoveAll(u => u.Nick == user.Nick);
+
                 var partMsg = new ChatMessage(
                     DateTime.UtcNow,
                     user,
@@ -207,8 +213,8 @@ namespace LoboForge.TNOIRC.Commands
                 chan.Messages.Add(partMsg);
                 EventBus.Publish(new ChannelMessageReceivedEvent(user, channel, partMsg.Content, false));
             }
-
             EventBus.Publish(new UserPartedEvent(user, channel, reason));
+
         }
     }
 
@@ -358,7 +364,8 @@ namespace LoboForge.TNOIRC.Commands
             // Add quit message to all channels where user was present
             foreach (var chan in Common.ircClient.JoinedChannels)
             {
-                if (chan.Users.Any(u => u.Nick == user.Nick))
+                // Remove from user list
+                if (chan.Users.RemoveAll(u => u.Nick == user.Nick) > 0)
                 {
                     var quitMsg = new ChatMessage(
                         DateTime.UtcNow,
@@ -373,7 +380,6 @@ namespace LoboForge.TNOIRC.Commands
                     EventBus.Publish(new ChannelMessageReceivedEvent(user, chan.Name, quitMsg.Content, false));
                 }
             }
-
             EventBus.Publish(new UserQuitEvent(user, reason));
         }
     }
@@ -468,10 +474,12 @@ namespace LoboForge.TNOIRC.Commands
             var reason = message.Trailing ?? "";
 
             // Add kick message to channel
-            var chan = Common.ircClient.JoinedChannels
-                .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
+            var chan = Common.ircClient.JoinedChannels.FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
             if (chan != null)
             {
+                // Remove kicked user from user list
+                chan.Users.RemoveAll(u => u.Nick == kickedUser);
+
                 var kickMsg = new ChatMessage(
                     DateTime.UtcNow,
                     kicker,
@@ -486,8 +494,8 @@ namespace LoboForge.TNOIRC.Commands
                 chan.Messages.Add(kickMsg);
                 EventBus.Publish(new ChannelMessageReceivedEvent(kicker, channel, kickMsg.Content, false));
             }
-
             EventBus.Publish(new KickedFromChannelEvent(kicker, channel, kickedUser, reason));
+
         }
     }
 

@@ -26,6 +26,12 @@
         <div class="dock-icon" title="Tile All" @onclick="TileAllWindows">
             <span class="oi oi-grid-three-up"></span>
         </div>
+        <div class="dock-icon" title="Tile All" @onclick="ToggleCTFToolsWindow">
+            <span class="oi oi-grid-three-up"></span>
+        </div>
+        <div class="dock-icon" title="Tile All" @onclick="ToggleImageToolsWindow">
+            <span class="oi oi-image"></span>
+        </div>
         <div class="dock-icon" title="Connection" @onclick="ToggleConnectionWindow">
             <span class="oi oi-cloud"></span>
         </div>
@@ -84,7 +90,7 @@
         EventBus.Unsubscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
         EventBus.Unsubscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
         EventBus.Unsubscribe<UserJoinedEvent>(HandleUserJoined);
-
+        EventBus.Unsubscribe<UserIpLookupRequestedEvent>(HandleUserIpLookup);
 
         // --- SINGLE handler per event ---
         EventBus.Subscribe<SelfJoinedChannelEvent>(HandleSelfJoinedChannel);
@@ -92,7 +98,31 @@
         EventBus.Subscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
         EventBus.Subscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
         EventBus.Subscribe<UserJoinedEvent>(HandleUserJoined);
+        EventBus.Subscribe<UserIpLookupRequestedEvent>(HandleUserIpLookup);
     }
+    private void HandleUserIpLookup(UserIpLookupRequestedEvent evt)
+    {
+        var title = $"IPWhois: {evt.User.Nick}";
+        // Don't open if it's already open (by IP or nick)
+        if (OpenWindows.Any(w => w.Title == title))
+            return;
+
+        var fragment = new RenderFragment(builder =>
+        {
+            builder.OpenComponent(0, typeof(IpWhoIsWindow));
+            builder.AddAttribute(1, "User", evt.User);
+            builder.CloseComponent();
+        });
+
+        OpenWindows.Add(new Window
+        {
+            Title = title,
+            Type = WindowType.IpWhois, // Add this type to your WindowType enum!
+            ChildContent = fragment
+        });
+        StateHasChanged();
+    }
+
     private void HandleChannelMessage(ChannelMessageReceivedEvent evt)
     {
         TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content);
@@ -380,6 +410,26 @@
         }
     }
 
+    private void ToggleCTFToolsWindow(MouseEventArgs args)
+    {
+        var logwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.CTF);
+        if (logwindow != null) OpenWindows.Remove(logwindow);
+        else
+        {
+            var window = new Window
+            {
+                Title = "CTF Tools",
+                Type = WindowType.CTF,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(CTFToolsWindow));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+        }
+    }
     private void ToggleCommandWindow(MouseEventArgs args)
     {
         var commandwindow = OpenWindows.FirstOrDefault(c => c.Type == WindowType.Commands);
@@ -487,6 +537,23 @@
             OpenWindows.Add(window);
         }
     }
+    private void ToggleImageToolsWindow(MouseEventArgs args)
+    {
+
+            var window = new Window
+            {
+                Title = "Image Tools",
+                Type = WindowType.ImageTools,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(ImageToolsWindow));
+                    builder.CloseComponent();
+                }
+            };
+
+            OpenWindows.Add(window);
+
+    }
 
     public void Dispose()
     {
@@ -496,4 +563,5 @@
         EventBus.Unsubscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
         EventBus.Unsubscribe<UserJoinedEvent>(HandleUserJoined);
     }
+
 }

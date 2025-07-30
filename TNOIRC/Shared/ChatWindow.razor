@@ -12,12 +12,21 @@ else
         <div class="flex-grow-1 d-flex overflow-hidden">
             @if (ShowUserList)
             {
-                <div class="user-list border-end pe-2 me-2" style="width: 160px; overflow-y: auto;">
-                    @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
-                    {
-                        <div class="user-entry" @onclick="() => StartPm(user)">@user.Nick</div>
-                    }
-                </div>
+                @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
+                {
+                    <div class="user-entry" @onclick="() => StartPm(user)">
+                        @user.Nick
+                        @if (user.HostIsIP())
+                        {
+                            <span title="Lookup IP" style="cursor:pointer; margin-left:6px;"
+                                  @onclick:stopPropagation
+                                  @onclick="() => RaiseIpLookup(user)">
+                                🔍
+                            </span>
+                        }
+                    </div>
+                }
+
             }
 
             <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
@@ -94,7 +103,10 @@ else
             StateHasChanged();
         });
     }
-
+    private void RaiseIpLookup(IrcUser user)
+    {
+        EventBus.Publish(new UserIpLookupRequestedEvent(user, Channel.Name));
+    }
     private void StartPm(IrcUser user)
     {
         EventBus.Publish(new RequestPrivateMessageEvent(user));
