@@ -102,7 +102,7 @@
     }
     private void HandleUserIpLookup(UserIpLookupRequestedEvent evt)
     {
-        var title = $"IPWhois: {evt.User.Nick}";
+@*         var title = $"IPWhois: {evt.User.Nick}";
         // Don't open if it's already open (by IP or nick)
         if (OpenWindows.Any(w => w.Title == title))
             return;
@@ -120,7 +120,7 @@
             Type = WindowType.IpWhois, // Add this type to your WindowType enum!
             ChildContent = fragment
         });
-        StateHasChanged();
+        StateHasChanged(); *@
     }
 
     private void HandleChannelMessage(ChannelMessageReceivedEvent evt)
