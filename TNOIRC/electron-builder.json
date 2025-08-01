@@ -1,0 +1,10 @@
+{
+  "linux": {
+    "maintainer": "LoboForge <dev@loboforge.com>",
+    "author": "LoboForge <dev@loboforge.com>",
+    "email": "dev@loboforge.com",
+    "icon": "icon.ico",
+    "category": "Utility",
+    "target": ["deb", "AppImage", "snap"]
+  }
+}
