@@ -1,15 +1,20 @@
 {
-  "name": "electron.net.host",
+  "name": "TNOIRC",
   "version": "1.0.0",
-  "description": "Electron-Host for Electron.NET.",
+  "description": "IRC client enabling SASL, TLS, and TOR. With Extras.",
   "repository": {
     "url": "https://github.com/ElectronNET/Electron.NET"
   },
+  "email": "dev@loboforge.com",
+  "url": "http://loboforge.com/TNOIRC",
   "main": "main.js",
-  "author": "Gregor Biswanger, Florian Rappl",
+  "author": "LoboForge <ev@loboforge.com> (http://loboforge.com/TNOIRC/)",
   "license": "MIT",
   "scripts": {
     "start": "tsc -p ."
+  },
+  "build": {
+    "icon": "appicon.png"
   },
   "dependencies": {
     "dasherize": "^2.0.0",

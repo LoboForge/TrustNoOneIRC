@@ -1,0 +1,95 @@
+@using LoboForge.TNOIRC.Models
+@using LoboForge.TNOIRC.Shared
+
+<div class="chat-window-content d-flex flex-column">
+    <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
+        @foreach (var msg in ToxMessages)
+        {
+            <div class="chat-message">
+                <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                <span class="user">@msg.Sender:</span>
+                <span class="text">
+                    @foreach (var line in msg.Content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
+                    {
+                        @line
+                        <br />
+                    }
+                </span>
+            </div>
+        }
+    </div>
+
+    <div style="position:absolute; bottom:50px; left:10px; width:90%; background-color:transparent;">
+        <button @onclick="ToggleSystemMessages">⚙️</button>
+    </div>
+
+    <div class="chat-input mt-1">
+        <input type="text"
+               @bind-value="CurrentMessage"
+               @bind-value:event="oninput"
+               @onkeydown="HandleKey"
+               placeholder="Type your message..." />
+        <button @onclick="SendToxMessage">Send</button>
+    </div>
+</div>
+
+@code {
+    [Inject] private ToxicService Toxic { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private string CurrentMessage = "";
+    private ElementReference MessagesDiv;
+    private List<ChatMessage> ToxMessages = new();
+    private bool ShowSystemMessages = true;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Toxic.OnOutput += HandleToxOutput;
+        Toxic.Start();
+    }
+
+    private void HandleToxOutput(string line)
+    {
+        if (!ShowSystemMessages && line.StartsWith("["))
+            return; // filter system lines like "[ERR]" or "[DEBUG]"
+
+        var msg = new ChatMessage(
+            DateTime.UtcNow,
+            new IrcUser("TOX", "", ""), // re-use IrcUser for now
+            "TOX",
+            line);
+
+        InvokeAsync(async () =>
+        {
+            ToxMessages.Add(msg);
+            StateHasChanged();
+            await ScrollToBottom();
+        });
+    }
+
+    private void SendToxMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(CurrentMessage))
+        {
+            Toxic.SendCommand(CurrentMessage);
+            CurrentMessage = "";
+        }
+    }
+
+    private void HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            SendToxMessage();
+    }
+
+    private void ToggleSystemMessages()
+    {
+        ShowSystemMessages = !ShowSystemMessages;
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await InvokeAsync(() => JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv));
+    }
+}

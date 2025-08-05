@@ -4,15 +4,20 @@
     "imageFile": ""
   },
   "name": "LoboForge.TNOIRC",
-  "author": "dev@loboforge.com",
+  "author": "LoboForge <dev@loboforge.com>",
   "description": "Trust No One IRC Client by LoboForge.com",
-  "icon": "./assets/icon.ico",
   "singleInstance": false,
   "environment": "Development",
+  "linux": {
+    "maintainer": "LoboForge <dev@loboforge.com>",
+    "icon": "/media/loboforge/Data/Development/TrustNoOneIRC/TNOIRC/appicon.png",
+    "category": "Network"
+  },
   "build": {
     "appId": "com.LoboForge.TNOIRC.app",
     "productName": "LoboForge.TNOIRC",
-    "copyright": "Copyright © 2020",
+    "icon": "/media/loboforge/Data/Development/TrustNoOneIRC/TNOIRC/appicon.png",
+    "copyright": "Copyright © 2024 LoboForge",
     "buildVersion": "1.0.0",
     "compression": "maximum",
     "directories": {
@@ -22,21 +27,24 @@
       {
         "from": "./bin",
         "to": "bin",
-        "filter": [ "**/*" ]
+        "filter": ["**/*"]
       }
     ],
     "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Network"
+      "target": ["AppImage", "deb"],
+      "icon": "icon.ico",
+      "category": "Network",
+      "maintainer": "LoboForge <dev@loboforge.com>"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/256x256.png"
     },
     "files": [
       {
         "from": "./node_modules",
         "to": "node_modules",
-        "filter": [ "**/*" ]
+        "filter": ["**/*"]
       },
       "**/*"
     ]

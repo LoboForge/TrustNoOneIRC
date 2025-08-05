@@ -29,6 +29,7 @@ namespace LoboForge.TNOIRC.Models
         AlertManager,
         CTF,
         ImageTools,
-        IpWhois
+        IpWhois,
+        ToxChat
     }
 }
