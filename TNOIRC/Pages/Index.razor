@@ -2,6 +2,7 @@
 @using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Shared
+@implements IDisposable
 @inject ToastService ToastService
 @inject IJSRuntime JS
 
@@ -17,7 +18,8 @@
                       Width="@window.Width"
                       Height="@window.Height"
                       OnCloseClicked='@(() => HandleWindowClose(window))'
-                      OnPositionChanged="pos => UpdateWindowPosition(window, pos)">
+                      OnPositionChanged="pos => UpdateWindowPosition(window, pos)"
+                      OnSizeChanged="size => UpdateWindowSize(window, size)">
             @window.ChildContent
         </HackerWindow>
     }
@@ -29,10 +31,10 @@
         <div class="dock-icon" title="TOX Chat" @onclick="ToggleToxWindow">
             <span class="oi oi-globe"></span>
         </div>
-        <div class="dock-icon" title="Tile All" @onclick="ToggleCTFToolsWindow">
+        <div class="dock-icon" title="CTF Tools" @onclick="ToggleCTFToolsWindow">
             <span class="oi oi-flag"></span>
         </div>
-        <div class="dock-icon" title="Tile All" @onclick="ToggleImageToolsWindow">
+        <div class="dock-icon" title="Image Tools" @onclick="ToggleImageToolsWindow">
             <span class="oi oi-image"></span>
         </div>
         <div class="dock-icon" title="Connection" @onclick="ToggleConnectionWindow">
@@ -102,6 +104,12 @@
         EventBus.Subscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
         EventBus.Subscribe<UserJoinedEvent>(HandleUserJoined);
         EventBus.Subscribe<UserIpLookupRequestedEvent>(HandleUserIpLookup);
+        EventBus.Subscribe<ConnectionCompletedEvent>(HandleConnectionCompleted);
+    }
+
+    private void HandleConnectionCompleted(ConnectionCompletedEvent evt)
+    {
+        InvokeAsync(StateHasChanged);
     }
     private void HandleUserIpLookup(UserIpLookupRequestedEvent evt)
     {
@@ -129,11 +137,13 @@
     private void HandleChannelMessage(ChannelMessageReceivedEvent evt)
     {
         TryTriggerAlert("ChannelMessage", evt.Sender.Nick, evt.Target, evt.Content);
+        InvokeAsync(StateHasChanged);
     }
 
     private void HandleUserJoined(UserJoinedEvent evt)
     {
         TryTriggerAlert("UserJoined", evt.User.Nick, evt.Channel);
+        InvokeAsync(StateHasChanged);
     }
     private void HandlePrivateMessage(PrivateMessageReceivedEvent evt)
     {
@@ -211,17 +221,18 @@
 
     private void HandleWindowClose(Window window)
     {
-        if (window.Type == WindowType.Channel)
+        if (window.Type == WindowType.Channel && !window.Title.StartsWith("*"))
         {
             var channel = Common.ircClient.JoinedChannels.FirstOrDefault(c => c.Name == window.Title);
-            if (channel != null)
+            if (channel != null && Common.IsConnected)
             {
                 Common.ircClient.LeaveChannel(channel.Name, "Leaving...");
                 Common.ircClient.JoinedChannels.Remove(channel);
             }
         }
 
-        RemoveWindowById(window.ID);
+        OpenWindows.RemoveAll(w => w.ID == window.ID);
+        StateHasChanged();
     }
 
     private void OpenPrivateMessageWindow(PrivateConversation convo)
@@ -265,9 +276,11 @@
         };
 
         OpenWindows.Add(window);
+        channel.LastChecked = DateTime.UtcNow;
+        StateHasChanged();
     }
 
-    void RemoveWindowById(string id)
+    private void RemoveWindowById(string id)
     {
         OpenWindows.RemoveAll(w => w.ID == id);
     }
@@ -340,7 +353,7 @@
         var window = new Window
         {
             Title = title,
-            Type = WindowType.Channel, // Treat it like a channel window for simplicity
+            Type = WindowType.System,
         };
         window.ChildContent = builder =>
         {
@@ -360,6 +373,12 @@
     {
         window.Top = pos.Top;
         window.Left = pos.Left;
+    }
+
+    private void UpdateWindowSize(Window window, (int Width, int Height) size)
+    {
+        window.Width = size.Width;
+        window.Height = size.Height;
     }
 
     private void TileAllWindows()
@@ -442,7 +461,7 @@
             var window = new Window
             {
                 Title = "Commands",
-                Type = WindowType.Settings,
+                Type = WindowType.Commands,
                 ChildContent = builder =>
                 {
                     builder.OpenComponent(0, typeof(RawCommandWindow));
@@ -462,7 +481,7 @@
         {
             var window = new Window
             {
-                Title = "Commands",
+                Title = "Auto Reply",
                 Type = WindowType.AutoReply,
                 ChildContent = builder =>
                 {
@@ -542,20 +561,23 @@
     }
     private void ToggleImageToolsWindow(MouseEventArgs args)
     {
+        var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.ImageTools);
+        if (existing != null)
+        {
+            OpenWindows.Remove(existing);
+            return;
+        }
 
-            var window = new Window
+        OpenWindows.Add(new Window
+        {
+            Title = "Image Tools",
+            Type = WindowType.ImageTools,
+            ChildContent = builder =>
             {
-                Title = "Image Tools",
-                Type = WindowType.ImageTools,
-                ChildContent = builder =>
-                {
-                    builder.OpenComponent(0, typeof(ImageToolsWindow));
-                    builder.CloseComponent();
-                }
-            };
-
-            OpenWindows.Add(window);
-
+                builder.OpenComponent(0, typeof(ImageToolsWindow));
+                builder.CloseComponent();
+            }
+        });
     }
     private void ToggleToxWindow(MouseEventArgs args)
     {
@@ -588,6 +610,8 @@
         EventBus.Unsubscribe<PrivateMessageReceivedEvent>(HandlePrivateMessage);
         EventBus.Unsubscribe<ChannelMessageReceivedEvent>(HandleChannelMessage);
         EventBus.Unsubscribe<UserJoinedEvent>(HandleUserJoined);
+        EventBus.Unsubscribe<UserIpLookupRequestedEvent>(HandleUserIpLookup);
+        EventBus.Unsubscribe<ConnectionCompletedEvent>(HandleConnectionCompleted);
     }
 
 }

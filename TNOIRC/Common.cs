@@ -5,8 +5,8 @@ namespace LoboForge.TNOIRC
 {
     public static class Common
     {
-        public static AppConfig Config { get; set; }
-        public static IrcClientService ircClient;
+        public static AppConfig Config { get; set; } = new();
+        public static IrcClientService ircClient = CreateGuestClient();
         public static IrcCommandDispatcher Dispatcher = new IrcCommandDispatcher(new List<IIrcCommandHandler>
         {
             new PrivMsgHandler(),           // Handles PRIVMSG
@@ -27,5 +27,10 @@ namespace LoboForge.TNOIRC
             new NoTopicHandler(),
             new ErrorHandler(),
         });
+
+        public static bool IsConnected => ircClient.IsConnected;
+
+        public static IrcClientService CreateGuestClient() =>
+            new("localhost", 6667, "Guest", "guest", Dispatcher);
     }
 }

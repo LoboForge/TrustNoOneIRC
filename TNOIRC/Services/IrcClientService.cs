@@ -21,6 +21,7 @@ public class IrcClientService
     public int Port;
     public string Nick;
     public string User;
+    public bool IsConnected { get; private set; }
     private readonly bool _useTor;
     private readonly bool _useTls;
     private readonly bool _useSasl;
@@ -76,6 +77,7 @@ public class IrcClientService
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
+        IsConnected = false;
         if (_useTor)
             await TorSocks5Helper.EnsureTorReadyAsync(cancellationToken);
 
@@ -278,6 +280,7 @@ public class IrcClientService
             {
                 Console.WriteLine("[IRC] Registration complete.");
                 registrationComplete = true;
+                IsConnected = true;
 
                 var welcomeMessage = message.Trailing ?? "Welcome";
                 EventBus.Publish(new ConnectionCompletedEvent(welcomeMessage));

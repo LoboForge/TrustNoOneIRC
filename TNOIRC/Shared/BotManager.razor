@@ -94,8 +94,7 @@
     private List<string> Errors = new();
     private PluginService PluginService = new();
     private IBotMetadata? SelectedBotForLogs;
-    private string BotFolderOverride = "D:\\Development\\TrustNoOneIRC\\GhostRootBot";
-    private bool eventsSubscribed = false;
+    private string BotFolderOverride = "./Bots";
 
     protected override void OnInitialized()
     {
@@ -117,7 +116,6 @@
         Bots = allBots;
         Errors = codBots.Errors.Concat(dllBots.Errors).ToList();
         SelectedBotForLogs = null;
-        SubscribeBotEvents();
         StateHasChanged();
     }
 
@@ -147,23 +145,7 @@
         StateHasChanged();
     }
 
-    private void SubscribeBotEvents()
-    {
-        if (eventsSubscribed) return;
-        eventsSubscribed = true;
-
-        EventBus.Subscribe<BotPrivateMessageEvent>(evt =>
-        {
-            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Nick} :{evt.Message}");
-        });
-        EventBus.Subscribe<BotSendChannelMessageEvent>(evt =>
-        {
-            Common.ircClient.SendRawAsync($"PRIVMSG {evt.Channel} :{evt.Message}");
-        });
-    }
-
     public void Dispose()
     {
-        // TODO: Add EventBus.Unsubscribe if you store the delegates for removal
     }
 }

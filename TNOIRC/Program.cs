@@ -35,6 +35,7 @@ app.MapBlazorHub(options =>
 app.MapFallbackToPage("/_Host");
 
 ConfigService.Load();
+BotService.LoadBots();
 
 if (HybridSupport.IsElectronActive)
 {

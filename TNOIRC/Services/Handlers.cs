@@ -276,8 +276,7 @@ namespace LoboForge.TNOIRC.Commands
 
         public void Handle(IrcMessage message)
         {
-            var welcome = message.Trailing ?? "";
-            EventBus.Publish(new ConnectionCompletedEvent(welcome));
+            // ConnectionCompletedEvent is published by IrcClientService after full registration.
         }
     }
     public class ChannelListHandler : IIrcCommandHandler

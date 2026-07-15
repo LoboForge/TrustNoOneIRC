@@ -19,6 +19,7 @@ namespace LoboForge.TNOIRC.Models
     public enum WindowType
     {
         Channel,
+        System,
         Join,
         Log,
         PM,

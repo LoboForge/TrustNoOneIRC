@@ -1,10 +1,10 @@
 ﻿@using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Shared
-@inherits LayoutComponentBase
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
-<div @ref="windowRef" class="hacker-window" @onmousedown="@(() => BringToFront())" style="position:absolute; top:@TopPx; left:@LeftPx; width:@WidthPx; height:@HeightPx;">
+<div @ref="windowRef" class="hacker-window" @onmousedown="BringToFront" style="position:absolute; top:@TopPx; left:@LeftPx; width:@WidthPx; height:@HeightPx; z-index:@window.index;">
     <div class="title-bar" @onmousedown="StartDrag">
         <span class="title-text">@Title</span>
 
@@ -28,17 +28,20 @@
 </div>
 
 @code {
-    [Parameter] public Window window { get; set; }
+    [Parameter] public Window window { get; set; } = default!;
     [Parameter] public string Title { get; set; } = "Surveillance Feed";
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnCloseClicked { get; set; }
     [Parameter] public EventCallback<(int Top, int Left)> OnPositionChanged { get; set; }
+    [Parameter] public EventCallback<(int Width, int Height)> OnSizeChanged { get; set; }
     [Parameter] public int Top { get; set; }
     [Parameter] public int Left { get; set; }
     [Parameter] public int Width { get; set; }
     [Parameter] public int Height { get; set; }
 
     private DotNetObjectReference<HackerWindow>? _ref;
+    private int _savedWidth = 500;
+    private int _savedHeight = 500;
 
     private string TopPx => $"{Top}px";
     private string LeftPx => $"{Left}px";
@@ -47,7 +50,13 @@
 
     private ElementReference windowRef;
 
-    private async void OnClose()
+    protected override void OnInitialized()
+    {
+        _savedWidth = Width > 0 ? Width : window.Width;
+        _savedHeight = Height > 0 ? Height : window.Height;
+    }
+
+    private async Task OnClose()
     {
         await OnCloseClicked.InvokeAsync();
     }
@@ -57,40 +66,61 @@
         if (firstRender)
         {
             _ref = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, _ref);
         }
     }
 
     [JSInvokable]
     public async Task UpdateWindowPosition(int top, int left)
     {
+        window.Top = top;
+        window.Left = left;
         if (OnPositionChanged.HasDelegate)
             await OnPositionChanged.InvokeAsync((top, left));
     }
 
-    public async ValueTask DisposeAsync()
+    [JSInvokable]
+    public async Task UpdateWindowSize(int width, int height)
     {
-        _ref?.Dispose();
+        window.Width = width;
+        window.Height = height;
+        Width = width;
+        Height = height;
+        if (OnSizeChanged.HasDelegate)
+            await OnSizeChanged.InvokeAsync((width, height));
     }
-    private async void StartDrag(MouseEventArgs e) =>
-        await JS.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, e.ClientX, e.ClientY);
 
-    private async void StartResize(MouseEventArgs e) =>
-        await JS.InvokeVoidAsync("hackerWindowInterop.startResize", windowRef, e.ClientX, e.ClientY);
+    private async Task StartDrag(MouseEventArgs e) =>
+        await JS.InvokeVoidAsync("hackerWindowInterop.startDrag", windowRef, e.ClientX, e.ClientY, _ref);
 
-    private async void BringToFront() =>
+    private async Task StartResize(MouseEventArgs e) =>
+        await JS.InvokeVoidAsync("hackerWindowInterop.startResize", windowRef, e.ClientX, e.ClientY, _ref);
+
+    private async Task BringToFront() =>
         await JS.InvokeVoidAsync("hackerWindowInterop.bringToFront", windowRef);
 
     private void OnMinimize(MouseEventArgs args)
     {
         window.IsMinimized = true;
-        Height = 40;
-        Width = 300;
+        _savedWidth = window.Width;
+        _savedHeight = window.Height;
+        window.Width = 300;
+        window.Height = 40;
+        Width = window.Width;
+        Height = window.Height;
     }
+
     private void OnRestore(MouseEventArgs args)
     {
         window.IsMinimized = false;
-        Height = 500;
-        Width = 500;
+        window.Width = _savedWidth;
+        window.Height = _savedHeight;
+        Width = window.Width;
+        Height = window.Height;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _ref?.Dispose();
+        await Task.CompletedTask;
     }
 }

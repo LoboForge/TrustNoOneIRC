@@ -1,6 +1,7 @@
 ﻿@using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Shared
+@implements IDisposable
 @inject IJSRuntime JSRuntime
 
 @if (Conversation is null)
@@ -11,19 +12,13 @@ else
 {
     <div class="private-message-window d-flex flex-column">
         <div class="pm-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
-            @try {
-                @foreach (var msg in Conversation.Messages)
-                {
-                    <div class="pm-message">
-                        <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                        <span class="user">@msg.Sender.Nick:</span>
-                        <span class="text">@msg.Content</span>
-                    </div>
-                }
-            }
-            catch (Exception)
+            @foreach (var msg in Conversation.Messages)
             {
-                <button @onclick="()=>{ StateHasChanged(); }">Refresh</button>
+                <div class="pm-message">
+                    <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
+                    <span class="user">@msg.Sender.Nick:</span>
+                    <span class="text">@msg.Content</span>
+                </div>
             }
         </div>
 
@@ -32,8 +27,9 @@ else
                    @bind-value="CurrentMessage"
                    @bind-value:event="oninput"
                    @onkeydown="HandleKey"
-                   placeholder="Type your message..." />
-            <button @onclick="SendMessage">Send</button>
+                   placeholder="Type your message..."
+                   disabled="@(!Common.IsConnected)" />
+            <button @onclick="SendMessage" disabled="@(!Common.IsConnected)">Send</button>
         </div>
     </div>
 }
@@ -43,18 +39,24 @@ else
 
     private string CurrentMessage = "";
     private ElementReference MessagesDiv;
+    private Action<PrivateMessageReceivedEvent>? _messageHandler;
+
     protected override void OnInitialized()
     {
-        base.OnInitialized();
-        EventBus.Subscribe<PrivateMessageReceivedEvent>(HandleNewMessage);
+        _messageHandler = HandleNewMessage;
+        EventBus.Subscribe<PrivateMessageReceivedEvent>(_messageHandler);
     }
-    private void HandleKey(KeyboardEventArgs e)
+
+    private async Task HandleKey(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
-            SendMessage();
+            await SendMessage();
     }
+
     private async void HandleNewMessage(PrivateMessageReceivedEvent evt)
     {
+        if (!evt.Sender.Nick.Equals(Conversation.User.Nick, StringComparison.OrdinalIgnoreCase))
+            return;
 
         await InvokeAsync(async () =>
         {
@@ -68,18 +70,31 @@ else
     {
         await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
     }
-    private void SendMessage()
+
+    private async Task SendMessage()
     {
-        if (!string.IsNullOrWhiteSpace(CurrentMessage))
-        {
-            Common.ircClient.SendMessageAsync(Conversation.User.Nick, CurrentMessage);
-            Conversation.Messages.Add(new ChatMessage(DateTime.Now, new IrcUser(Common.ircClient.Nick), Conversation.User.Nick, CurrentMessage, false));
-            CurrentMessage = "";
-        }
+        if (!Common.IsConnected || string.IsNullOrWhiteSpace(CurrentMessage))
+            return;
+
+        await Common.ircClient.SendMessageAsync(Conversation.User.Nick, CurrentMessage);
+        Conversation.Messages.Add(new ChatMessage(
+            DateTime.UtcNow,
+            new IrcUser(Common.ircClient.Nick),
+            Conversation.User.Nick,
+            CurrentMessage,
+            false));
+        CurrentMessage = "";
+        await ScrollToBottom();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
+        await ScrollToBottom();
+    }
+
+    public void Dispose()
+    {
+        if (_messageHandler != null)
+            EventBus.Unsubscribe<PrivateMessageReceivedEvent>(_messageHandler);
     }
 }

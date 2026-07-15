@@ -2,6 +2,7 @@
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
+@implements IDisposable
 
 <div class="chat-window-content d-flex flex-column">
     <div class="flex-grow-1 d-flex overflow-hidden">
@@ -127,7 +128,8 @@
             {
                 double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
                 await Task.Delay(TimeSpan.FromSeconds(delay));
-                await Common.ircClient.SendMessageAsync(evt.Sender.Nick, pair.Reply);
+                if (Common.IsConnected)
+                    await Common.ircClient.SendMessageAsync(evt.Sender.Nick, pair.Reply);
                 break;
             }
         }
@@ -152,7 +154,8 @@
             {
                 double delay = pair.MinDelay + new Random().NextDouble() * (pair.MaxDelay - pair.MinDelay);
                 await Task.Delay(TimeSpan.FromSeconds(delay));
-                await Common.ircClient.SendMessageAsync(evt.Target, pair.Reply);
+                if (Common.IsConnected)
+                    await Common.ircClient.SendMessageAsync(evt.Target, pair.Reply);
                 break;
             }
         }

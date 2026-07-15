@@ -37,8 +37,7 @@ public class IrcUser
             }
         }
 
-        return new IrcUser(nick, user, host);
-
+        return new IrcUser(nick, user, host, host);
     }
 
 
@@ -47,5 +46,8 @@ public class IrcUser
 public static class IrcUserExtensions
 {
     public static bool HostIsIP(this IrcUser user)
-        => System.Net.IPAddress.TryParse(user.Host, out _);
+    {
+        var host = !string.IsNullOrWhiteSpace(user.Hostname) ? user.Hostname : user.Host;
+        return System.Net.IPAddress.TryParse(host, out _);
+    }
 }

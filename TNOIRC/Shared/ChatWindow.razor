@@ -1,6 +1,8 @@
 ﻿@using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Shared
+@implements IDisposable
+@inject IJSRuntime JSRuntime
 
 @if (Channel is null)
 {
@@ -12,21 +14,22 @@ else
         <div class="flex-grow-1 d-flex overflow-hidden">
             @if (ShowUserList)
             {
-                @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
-                {
-                    <div class="user-entry" @onclick="() => StartPm(user)">
-                        @user.Nick
-                        @if (user.HostIsIP())
-                        {
-                            <span title="Lookup IP" style="cursor:pointer; margin-left:6px;"
-                                  @onclick:stopPropagation
-                                  @onclick="() => RaiseIpLookup(user)">
-                                🔍
-                            </span>
-                        }
-                    </div>
-                }
-
+                <div class="user-list">
+                    @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
+                    {
+                        <div class="user-entry" @onclick="() => StartPm(user)">
+                            @user.Nick
+                            @if (user.HostIsIP())
+                            {
+                                <span title="Lookup IP" style="cursor:pointer; margin-left:6px;"
+                                      @onclick:stopPropagation
+                                      @onclick="() => RaiseIpLookup(user)">
+                                    🔍
+                                </span>
+                            }
+                        </div>
+                    }
+                </div>
             }
 
             <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
@@ -64,7 +67,6 @@ else
             </div>
         </div>
         <div style="position:absolute; bottom:50px; left:10px; width:90%; background-color:transparent;">
-
             <button @onclick="ToggleUserList">👥</button>
         </div>
         <div class="chat-input mt-1">
@@ -72,8 +74,9 @@ else
                    @bind-value="CurrentMessage"
                    @bind-value:event="oninput"
                    @onkeydown="HandleKey"
-                   placeholder="Type your message..." />
-            <button @onclick="SendMessage">Send</button>
+                   placeholder="Type your message..."
+                   disabled="@(!Common.IsConnected)" />
+            <button @onclick="SendMessage" disabled="@(!Common.IsConnected)">Send</button>
         </div>
     </div>
 }
@@ -82,31 +85,34 @@ else
     [Parameter] public IrcChannel Channel { get; set; } = default!;
     [Parameter] public EventCallback OnClose { get; set; }
 
-    private async Task CloseWindow()
-    {
-        await OnClose.InvokeAsync();
-    }
     private string CurrentMessage = "";
     private ElementReference MessagesDiv;
     private bool ShowUserList = true;
+
+    private Action<ChannelMessageReceivedEvent>? _messageHandler;
+    private Action<UserJoinedEvent>? _joinHandler;
+
     protected override void OnInitialized()
     {
-        base.OnInitialized();
-        EventBus.Subscribe<ChannelMessageReceivedEvent>(HandleNewMessage);
-        EventBus.Subscribe<UserJoinedEvent>(HandleUserJoined);
+        _messageHandler = HandleNewMessage;
+        _joinHandler = HandleUserJoined;
+        EventBus.Subscribe<ChannelMessageReceivedEvent>(_messageHandler);
+        EventBus.Subscribe<UserJoinedEvent>(_joinHandler);
     }
 
     private async void HandleUserJoined(UserJoinedEvent evt)
     {
-        await InvokeAsync(async () =>
-        {
-            StateHasChanged();
-        });
+        if (!string.Equals(evt.Channel, Channel.Name, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        await InvokeAsync(StateHasChanged);
     }
+
     private void RaiseIpLookup(IrcUser user)
     {
         EventBus.Publish(new UserIpLookupRequestedEvent(user, Channel.Name));
     }
+
     private void StartPm(IrcUser user)
     {
         EventBus.Publish(new RequestPrivateMessageEvent(user));
@@ -116,6 +122,7 @@ else
     {
         ShowUserList = !ShowUserList;
     }
+
     private async void HandleNewMessage(ChannelMessageReceivedEvent evt)
     {
         if (!string.Equals(evt.Target, Channel.Name, StringComparison.OrdinalIgnoreCase))
@@ -140,25 +147,31 @@ else
         await ScrollToBottom();
     }
 
-    private void SendMessage()
+    private async Task SendMessage()
     {
-        if (!string.IsNullOrWhiteSpace(CurrentMessage))
-        {
-            Common.ircClient.SendMessageAsync(Channel.Name, CurrentMessage);
-            CurrentMessage = "";
-        }
+        if (!Common.IsConnected || string.IsNullOrWhiteSpace(CurrentMessage))
+            return;
+
+        await Common.ircClient.SendMessageAsync(Channel.Name, CurrentMessage);
+        CurrentMessage = "";
     }
 
-    private void HandleKey(KeyboardEventArgs e)
+    private async Task HandleKey(KeyboardEventArgs e)
     {
         if (e.Key == "Enter")
-            SendMessage();
+            await SendMessage();
     }
 
     private async Task ScrollToBottom()
     {
-        await InvokeAsync(() => JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv));
+        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
     }
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    public void Dispose()
+    {
+        if (_messageHandler != null)
+            EventBus.Unsubscribe<ChannelMessageReceivedEvent>(_messageHandler);
+        if (_joinHandler != null)
+            EventBus.Unsubscribe<UserJoinedEvent>(_joinHandler);
+    }
 }
