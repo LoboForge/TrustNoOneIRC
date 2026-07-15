@@ -17,7 +17,7 @@
     protected override void OnInitialized()
     {
         toxicService = new ToxicService();
-        Toxic.OnOutput += line =>
+        toxicService.OnOutput += line =>
         {
             InvokeAsync(() =>
             {
@@ -25,14 +25,14 @@
                 StateHasChanged();
             });
         };
-        Toxic.Start();
+        toxicService.Start();
     }
 
     private void HandleEnter(KeyboardEventArgs e)
     {
         if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(Command))
         {
-            Toxic.SendCommand(Command);
+            toxicService.SendCommand(Command);
             Command = "";
         }
     }

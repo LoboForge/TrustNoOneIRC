@@ -1,4 +1,5 @@
 ﻿using LoboForge.TNOIRC;
+using LoboForge.TNOIRC.Services;
 using System.Reflection;
 using System.Text.Json;
 
@@ -19,12 +20,14 @@ public static class ConfigService
         if (File.Exists(ConfigPath))
         {
             var json = File.ReadAllText(ConfigPath);
-            Common.Config = JsonSerializer.Deserialize<AppConfig>(json);
+            Common.Config = JsonSerializer.Deserialize<AppConfig>(json) ?? new AppConfig();
         }
         else
         {
             Common.Config = new AppConfig();
         }
+
+        ApplyTorSettings();
     }
 
     public static void Save()
@@ -35,5 +38,12 @@ public static class ConfigService
 
         var json = JsonSerializer.Serialize(Common.Config, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(ConfigPath, json);
+    }
+
+    private static void ApplyTorSettings()
+    {
+        TorSocks5Helper.TorExecutablePath = Common.Config.TorExecutablePath;
+        if (Common.Config.TorSocksPort > 0)
+            TorSocks5Helper.SocksPort = Common.Config.TorSocksPort;
     }
 }

@@ -56,9 +56,10 @@
 
         var msg = new ChatMessage(
             DateTime.UtcNow,
-            new IrcUser("TOX", "", ""), // re-use IrcUser for now
+            new IrcUser("TOX", "", ""),
             "TOX",
-            line);
+            line,
+            false);
 
         InvokeAsync(async () =>
         {

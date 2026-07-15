@@ -26,8 +26,8 @@
         <div class="dock-icon" title="Tile All" @onclick="TileAllWindows">
             <span class="oi oi-grid-three-up"></span>
         </div>
-        <div class="dock-icon" title="TOX Chat" @onclick="ToggleToxWindow"></div>
-            <span class="oi oi-globe"></span> <!-- you can swap icon -->
+        <div class="dock-icon" title="TOX Chat" @onclick="ToggleToxWindow">
+            <span class="oi oi-globe"></span>
         </div>
         <div class="dock-icon" title="Tile All" @onclick="ToggleCTFToolsWindow">
             <span class="oi oi-flag"></span>
@@ -572,7 +572,7 @@
                 Type = WindowType.ToxChat,
                 ChildContent = builder =>
                 {
-                    builder.OpenComponent(0, typeof(ToxChatWindow));
+                    builder.OpenComponent(0, typeof(ToxicWindow));
                     builder.CloseComponent();
                 }
             };

@@ -89,16 +89,38 @@ Built files will appear under `bin/Desktop/`.
 
 ## 🔐 Certificate Authentication (SASL EXTERNAL)
 
+There is **no SSH key authentication** in this client. IRC certificate login uses X509 client certificates over TLS with SASL EXTERNAL.
+
 ```bash
 openssl req -x509 -newkey rsa:4096 -keyout irc.key -out irc.crt -days 365 -nodes -subj "/CN=YourNick"
 openssl pkcs12 -export -out irc.pfx -inkey irc.key -in irc.crt
 ```
 
-Then connect normally, and register your fingerprint with:
+Supported certificate formats in the connection profile:
+
+- `.pfx` / `.p12` (recommended) — password optional
+- `.crt` / `.cert` / `.pem` — must have a matching `.key` file in the same directory
+
+Then connect with **TLS + SASL + Client Certificate** enabled, and register your fingerprint with:
 
 ```
 /msg NickServ CERT ADD <your sha512 fingerprint>
 ```
+
+---
+
+## 🧅 Tor on Linux
+
+The client uses SOCKS5 on `127.0.0.1:9050` (system Tor) or `127.0.0.1:9150` (Tor Browser). It auto-detects an already-running proxy.
+
+If Tor is not running, install and start it:
+
+```bash
+sudo apt install tor
+sudo systemctl start tor
+```
+
+Or start Tor Browser before connecting. The bundled `tor/torrc` is used when the app launches its own Tor process.
 
 ---
 

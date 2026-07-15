@@ -17,8 +17,6 @@ public class IrcClientService
     public List<IrcChannel> AvailableChannels { get; set; } = new();
     public List<IrcChannel> DirectMessages { get; set; } = new();
 
-
-
     public string Host;
     public int Port;
     public string Nick;
@@ -30,7 +28,6 @@ public class IrcClientService
     private readonly string? _saslPassword;
     private readonly string? _clientCertPath;
     private readonly string? _clientCertPassword;
-
 
     private TcpClient? _client;
     private StreamReader? _reader;
@@ -57,23 +54,32 @@ public class IrcClientService
         _useSasl = options.UseSasl;
         _saslUsername = options.SaslUsername;
         _saslPassword = options.SaslPassword;
-        _clientCertPath = options?.ClientCertPath;
-        _clientCertPassword = options?.ClientCertPassword;
-
+        _clientCertPath = options.ClientCertPath;
+        _clientCertPassword = options.ClientCertPassword;
     }
 
     public void StartService()
     {
-        _ = Task.Run(() => ConnectAsync(CancellationToken.None));
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ConnectAsync(CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[IRC] Connection failed: {ex.Message}");
+                EventBus.Publish(new ServerMessage($"Connection failed: {ex.Message}"));
+            }
+        });
     }
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
         if (_useTor)
-        {
-            TorSocks5Helper.StartTorIfNotRunning();
-        }
-        var stream = await EstablishConnectionAsync();
+            await TorSocks5Helper.EnsureTorReadyAsync(cancellationToken);
+
+        var stream = await EstablishConnectionAsync(cancellationToken);
         _reader = new StreamReader(stream, Encoding.UTF8);
         _writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
 
@@ -84,36 +90,33 @@ public class IrcClientService
         await ListenLoopAsync(cancellationToken);
     }
 
-    private async Task<Stream> EstablishConnectionAsync()
+    private async Task<Stream> EstablishConnectionAsync(CancellationToken cancellationToken)
     {
         Stream baseStream;
 
         if (_useTor)
         {
-            Console.WriteLine("[TOR] Connecting via Tor SOCKS5");
+            Console.WriteLine($"[TOR] Connecting to {Host}:{Port} via SOCKS5 127.0.0.1:{TorSocks5Helper.SocksPort}");
             baseStream = TorSocks5Helper.ConnectThroughTorPlain(Host, Port, out _client);
         }
         else
         {
             _client = new TcpClient();
-            await _client.ConnectAsync(Host, Port);
+            await _client.ConnectAsync(Host, Port, cancellationToken);
             baseStream = _client.GetStream();
         }
 
+        if (!_useTls)
+            return baseStream;
 
-        if (_useTls)
+        var ssl = new SslStream(baseStream, false, ValidateServerCertificate);
+
+        if (!string.IsNullOrEmpty(_clientCertPath))
         {
-            var ssl = new SslStream(baseStream, false, (sender, cert, chain, err) => true);
-
-            if (!string.IsNullOrEmpty(_clientCertPath))
+            var cert = ClientCertificateLoader.Load(_clientCertPath, _clientCertPassword);
+            try
             {
-                if (!File.Exists(_clientCertPath))
-                    throw new FileNotFoundException("Client cert not found", _clientCertPath);
-
-                var cert = new X509Certificate2(_clientCertPath, _clientCertPassword, X509KeyStorageFlags.Exportable);
-                try
-                {
-                    await ssl.AuthenticateAsClientAsync(
+                await ssl.AuthenticateAsClientAsync(
                     new SslClientAuthenticationOptions
                     {
                         TargetHost = Host,
@@ -121,71 +124,144 @@ public class IrcClientService
                         EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                         CertificateRevocationCheckMode = X509RevocationMode.NoCheck
                     },
-                    CancellationToken.None
-                );
-                }
-                catch (AuthenticationException ex)
-                {
-                    Console.WriteLine($"[TLS] Authentication failed: {ex.Message}");
-                    if (ex.InnerException != null)
-                        Console.WriteLine($"[TLS] Inner: {ex.InnerException.Message}");
-                    throw;
-                }
+                    cancellationToken);
             }
-            else
+            catch (AuthenticationException ex)
             {
-                await ssl.AuthenticateAsClientAsync(Host);
+                Console.WriteLine($"[TLS] Client certificate authentication failed: {ex.Message}");
+                if (ex.InnerException != null)
+                    Console.WriteLine($"[TLS] Inner: {ex.InnerException.Message}");
+                throw;
             }
-
-            return ssl;
+        }
+        else
+        {
+            await ssl.AuthenticateAsClientAsync(
+                new SslClientAuthenticationOptions
+                {
+                    TargetHost = Host,
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                },
+                cancellationToken);
         }
 
-        return baseStream;
+        Console.WriteLine("[TLS] Handshake complete.");
+        return ssl;
     }
 
     private async Task SaslAuthenticateAsync(CancellationToken cancellationToken)
     {
-        if (_writer == null || _reader == null) return;
+        if (_writer == null || _reader == null)
+            return;
 
-        await _writer.WriteLineAsync("CAP LS");
-        await _writer.WriteLineAsync("CAP REQ :sasl");
-        await _writer.WriteLineAsync("AUTHENTICATE EXTERNAL");
+        var useExternal = !string.IsNullOrEmpty(_clientCertPath);
+        var usePlain = !useExternal && !string.IsNullOrEmpty(_saslUsername);
 
-        string? line;
-        while ((line = await _reader.ReadLineAsync()) != null)
+        if (!useExternal && !usePlain)
+            throw new InvalidOperationException("SASL is enabled but no client certificate or username was provided.");
+
+        await _writer.WriteLineAsync("CAP LS 302");
+
+        var saslAcknowledged = false;
+        while (!saslAcknowledged)
         {
-            Console.WriteLine($"[RAW] {line}");
+            var line = await ReadServerLineAsync(cancellationToken);
+            if (line == null)
+                throw new InvalidOperationException("Connection closed during SASL capability negotiation.");
 
-            if (line.StartsWith("AUTHENTICATE +"))
+            if (IsCapMessage(line, "LS"))
             {
-                // EXTERNAL doesn't require any payload, just send an empty line
-                await _writer.WriteLineAsync("AUTHENTICATE +");
+                await _writer.WriteLineAsync("CAP REQ :sasl");
+                continue;
             }
 
-            if (line.Contains("903")) break; // SASL success
-            if (line.Contains("904") || line.Contains("905"))
-                throw new Exception("SASL authentication failed.");
+            if (IsCapMessage(line, "NAK"))
+                throw new InvalidOperationException("Server rejected SASL capability request.");
+
+            if (IsCapMessage(line, "ACK") && line.Contains("sasl", StringComparison.OrdinalIgnoreCase))
+                saslAcknowledged = true;
+        }
+
+        if (useExternal)
+        {
+            await _writer.WriteLineAsync("AUTHENTICATE EXTERNAL");
+        }
+        else
+        {
+            var credentials = $"\0{_saslUsername}\0{_saslPassword ?? string.Empty}";
+            var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials));
+            await _writer.WriteLineAsync($"AUTHENTICATE PLAIN {encoded}");
+        }
+
+        while (true)
+        {
+            var line = await ReadServerLineAsync(cancellationToken);
+            if (line == null)
+                throw new InvalidOperationException("Connection closed during SASL authentication.");
+
+            if (line.StartsWith("AUTHENTICATE +", StringComparison.OrdinalIgnoreCase))
+            {
+                await _writer.WriteLineAsync("AUTHENTICATE +");
+                continue;
+            }
+
+            if (line.Contains(" 903 ", StringComparison.Ordinal))
+                break;
+
+            if (line.Contains(" 904 ", StringComparison.Ordinal) || line.Contains(" 905 ", StringComparison.Ordinal))
+                throw new InvalidOperationException("SASL authentication failed.");
         }
 
         await _writer.WriteLineAsync("CAP END");
+        Console.WriteLine("[SASL] Authentication successful.");
     }
 
+    private async Task<string?> ReadServerLineAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var line = await _reader!.ReadLineAsync(cancellationToken);
+            if (line == null)
+                return null;
+
+            Console.WriteLine($"[RAW] {line}");
+            return line;
+        }
+
+        return null;
+    }
+
+    private static bool IsCapMessage(string line, string subcommand) =>
+        line.Contains(" CAP ", StringComparison.OrdinalIgnoreCase) &&
+        line.Contains($" {subcommand}", StringComparison.OrdinalIgnoreCase);
+
+    private static bool ValidateServerCertificate(
+        object sender,
+        X509Certificate? certificate,
+        X509Chain? chain,
+        SslPolicyErrors errors)
+    {
+        if (errors != SslPolicyErrors.None)
+            Console.WriteLine($"[TLS] Server certificate warning: {errors}");
+        return true;
+    }
 
     private async Task SendNickUserAsync(CancellationToken cancellationToken)
     {
-        //await Task.Delay(5000, cancellationToken);
         await _writer!.WriteLineAsync($"NICK {Nick}");
         await _writer.WriteLineAsync($"USER {User} 0 * :{User}");
     }
 
     private async Task ListenLoopAsync(CancellationToken cancellationToken)
     {
-        bool registrationComplete = false;
+        var registrationComplete = false;
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var line = await _reader!.ReadLineAsync();
-            if (line == null) break;
+            var line = await _reader!.ReadLineAsync(cancellationToken);
+            if (line == null)
+                break;
 
             Console.WriteLine($"[RAW] {line}");
             var rawmessage = $"SERVER: {line}".Trim();
@@ -218,9 +294,10 @@ public class IrcClientService
                 }
             }
 
-            if (!registrationComplete)
+            if (!registrationComplete && message.Command is "433" or "432")
             {
-                await Task.Delay(1000, cancellationToken);
+                Console.WriteLine("[IRC] Nickname rejected; retrying once with suffix.");
+                Nick = $"{Nick}_";
                 await SendNickUserAsync(cancellationToken);
             }
         }

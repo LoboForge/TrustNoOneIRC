@@ -2,8 +2,6 @@
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
-IRC.Services
-@using LoboForge.TNOIRC.Shared
 @implements IDisposable
 
 <div class="container mt-3">
@@ -72,7 +70,7 @@ IRC.Services
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
                     <label class="form-label">SASL Username</label>
-                    <input class="form-control" @bind="SelectedServer.SaslUsername" />
+                    <input class="form-control" @bind="SelectedServer.SaslUsername" placeholder="For SASL PLAIN (optional with cert)" />
                 </div>
 
                 <div class="col-md-6">
@@ -80,25 +78,26 @@ IRC.Services
                     <input type="password" class="form-control" @bind="SelectedServer.SaslPassword" />
                 </div>
             </div>
+        }
 
-            <div class="form-check form-switch mt-3">
-                <input class="form-check-input" type="checkbox" id="useCert" @bind="SelectedServer.UseClientCert">
-                <label class="form-check-label" for="useCert">Use Client Certificate</label>
-            </div>
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" id="useCert" @bind="SelectedServer.UseClientCert">
+            <label class="form-check-label" for="useCert">Use Client Certificate (TLS + SASL EXTERNAL)</label>
+        </div>
 
-            @if (SelectedServer.UseClientCert)
-            {
-                <div class="row g-3 mt-2">
-                    <div class="col-md-6">
-                        <label class="form-label">Client Cert Path</label>
-                        <input class="form-control" @bind="SelectedServer.ClientCertPath" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Client Cert Password</label>
-                        <input type="password" class="form-control" @bind="SelectedServer.ClientCertPassword" />
-                    </div>
+        @if (SelectedServer.UseClientCert)
+        {
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">Certificate Path</label>
+                    <input class="form-control" @bind="SelectedServer.ClientCertPath" placeholder="/path/to/irc.pfx or irc.crt + irc.key" />
+                    <small class="text-muted">Use .pfx/.p12, or .crt/.cert/.pem with a matching .key file in the same folder.</small>
                 </div>
-            }
+                <div class="col-md-6">
+                    <label class="form-label">Certificate Password</label>
+                    <input type="password" class="form-control" @bind="SelectedServer.ClientCertPassword" placeholder="Only required for .pfx/.p12" />
+                </div>
+            </div>
         }
         @if (SelectedServer != null)
         {
@@ -176,6 +175,12 @@ IRC.Services
     {
         var s = SelectedServer;
         if (s == null) return;
+
+        if (s.UseClientCert)
+        {
+            s.UseTls = true;
+            s.UseSasl = true;
+        }
 
         var options = new IrcConnectionOptions
         {
