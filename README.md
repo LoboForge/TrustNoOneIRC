@@ -16,6 +16,39 @@ This project brings a modern UI, hardened opsec, and the classic power of IRC to
 - 🪟 **Multi-Window Tabbed UI**: Each channel, PM, or server console lives in its own tab.
 - 🧙‍♂️ **Stylized Hacker Theme**: Matrix-green, smoked glass, and bold lines.  
 - 💻 **Cross-Platform**: Fully packaged builds for **Windows** and **Linux (AppImage + Snap)**.
+- 📋 **Tor-routed paste & image share**: Upload text/images via HTTPS over Tor — **no DCC** (see below).
+
+---
+
+## 🚫 Why There Is No DCC
+
+**DCC (Direct Client-to-Client) is intentionally not supported** and will not be added.
+
+DCC file and chat transfers are **peer-to-peer**. During a transfer, IRC clients exchange IP addresses and connect directly — bypassing the server and **defeating Tor**. That leaks your real network identity to the remote peer even when IRC itself is tunneled.
+
+TNO IRC is designed for **opsec-first** use:
+
+| Approach | IP exposure | Supported |
+|----------|-------------|-----------|
+| DCC SEND / CHAT | Direct P2P — **leaks IP** | ❌ Never |
+| IRC over Tor + TLS | Hidden via SOCKS | ✅ |
+| HTTPS paste/image link over Tor | Hidden via SOCKS | ✅ |
+
+**Instead of DCC**, use the built-in **Paste / Image Share** tool (dock icon) or slash commands:
+
+- Upload **text** → [paste.rs](https://paste.rs) via Tor
+- Upload **images** → [0x0.st](https://0x0.st) via Tor
+- Post the returned **URL** in channel — recipients fetch over their own connection
+
+Uploads require a running Tor SOCKS proxy (`127.0.0.1:9050` or `9150`). If Tor is not available, uploads are **blocked** rather than falling back to a direct connection that would leak your IP.
+
+### Share commands
+
+```
+/paste              Open the share window
+/paste some text    Upload text and post the link to the current channel
+/share              Same as /paste
+```
 
 ---
 
@@ -127,6 +160,7 @@ Or start Tor Browser before connecting. The bundled `tor/torrc` is used when the
 ## 🧠 Tips
 
 - Use `/whois YourNick` to verify that your cert was accepted.
+- Use **Paste / Image Share** (dock) to send files without DCC — links only, Tor-routed uploads.
 - All bots implement `IBot` and can respond to events or PMs — check the `BotScripts` folder for samples.
 
 ---

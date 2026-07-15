@@ -169,6 +169,7 @@ public enum IrcConnectionState
 public record ConnectionStateChangedEvent(IrcConnectionState State, string? Message);
 public record DisconnectedEvent(string? Reason, bool WillReconnect);
 public record WhoisInfoEvent(string Nick, IReadOnlyList<string> Lines, bool Complete);
+public record OpenShareWindowEvent(string? TargetChannel, string? PrefillText);
 
 public record UserIpLookupRequestedEvent
 {

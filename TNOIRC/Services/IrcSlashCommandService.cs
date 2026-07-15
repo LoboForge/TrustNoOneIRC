@@ -94,6 +94,21 @@ public static class IrcSlashCommandService
                 await Common.ircClient.DisconnectAsync(args, reconnect: false);
                 return true;
 
+            case "/paste":
+            case "/share":
+                if (!string.IsNullOrWhiteSpace(args) && !string.IsNullOrWhiteSpace(currentChannel))
+                {
+                    var pasteShare = GetPasteShareService();
+                    var result = await pasteShare.UploadTextAsync(args);
+                    if (result.Success)
+                        await Common.ircClient.SendMessageAsync(currentChannel, result.Url!);
+                }
+                else
+                {
+                    EventBus.Publish(new OpenShareWindowEvent(currentChannel, args));
+                }
+                return true;
+
             default:
                 return false;
         }
@@ -113,5 +128,11 @@ public static class IrcSlashCommandService
         if (space <= 0)
             return null;
         return (args[..space], args[(space + 1)..]);
+    }
+
+    private static PasteShareService GetPasteShareService()
+    {
+        // Slash commands run outside DI; use a lightweight instance (stateless HTTP uploads).
+        return new PasteShareService();
     }
 }

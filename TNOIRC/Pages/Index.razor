@@ -41,6 +41,9 @@
         <div class="dock-icon" title="Image Tools" @onclick="ToggleImageToolsWindow">
             <span class="oi oi-image"></span>
         </div>
+        <div class="dock-icon" title="Paste / Image Share (no DCC)" @onclick="ToggleShareWindow">
+            <span class="oi oi-share"></span>
+        </div>
         <div class="dock-icon" title="Connection" @onclick="ToggleConnectionWindow">
             <span class="oi oi-cloud"></span>
         </div>
@@ -116,6 +119,33 @@
         EventBus.Subscribe<ErrorEvent>(HandleError);
         EventBus.Subscribe<DisconnectedEvent>(HandleDisconnected);
         EventBus.Subscribe<WhoisInfoEvent>(HandleWhoisInfo);
+        EventBus.Subscribe<OpenShareWindowEvent>(HandleOpenShareWindow);
+    }
+
+    private void HandleOpenShareWindow(OpenShareWindowEvent evt)
+    {
+        OpenShareWindow(evt.TargetChannel, evt.PrefillText);
+    }
+
+    private void OpenShareWindow(string? targetChannel = null, string? prefillText = null)
+    {
+        var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.Share);
+        if (existing != null)
+            OpenWindows.Remove(existing);
+
+        OpenWindows.Add(new Window
+        {
+            Title = "Paste / Image Share",
+            Type = WindowType.Share,
+            ChildContent = builder =>
+            {
+                builder.OpenComponent(0, typeof(ShareWindow));
+                builder.AddAttribute(1, "TargetChannel", targetChannel);
+                builder.AddAttribute(2, "PrefillText", prefillText);
+                builder.CloseComponent();
+            }
+        });
+        StateHasChanged();
     }
 
     private void HandleConnectionStateChanged(ConnectionStateChangedEvent evt)
@@ -617,6 +647,8 @@
             OpenWindows.Add(window);
         }
     }
+    private void ToggleShareWindow(MouseEventArgs args) => OpenShareWindow();
+
     private void ToggleImageToolsWindow(MouseEventArgs args)
     {
         var existing = OpenWindows.FirstOrDefault(w => w.Type == WindowType.ImageTools);
@@ -675,6 +707,7 @@
         EventBus.Unsubscribe<ErrorEvent>(HandleError);
         EventBus.Unsubscribe<DisconnectedEvent>(HandleDisconnected);
         EventBus.Unsubscribe<WhoisInfoEvent>(HandleWhoisInfo);
+        EventBus.Unsubscribe<OpenShareWindowEvent>(HandleOpenShareWindow);
     }
 
 }

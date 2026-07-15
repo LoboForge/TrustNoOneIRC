@@ -17,6 +17,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<ToastService>();
 builder.Services.AddSingleton<ToxicService>();
+builder.Services.AddSingleton<PasteShareService>();
 
 var app = builder.Build();
 
