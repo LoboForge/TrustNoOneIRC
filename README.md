@@ -90,11 +90,59 @@ _"You're in a dark room... connected to an IRC server... over Tor... with cert-b
 
 ---
 
-### 🔧 Run Locally
+### 🐧 Linux quick setup (Tor + client cert)
+
+If your IRC certificates live in `/home/wrath/Keys` (or another folder), use the setup script:
 
 ```bash
-git clone https://github.com/yourname/tno-irc-client.git
-cd tno-irc-client
+git clone https://github.com/LoboForge/TrustNoOneIRC.git
+cd TrustNoOneIRC
+./scripts/setup-local-linux.sh
+```
+
+The script checks dependencies, builds the solution, and writes `~/.config/LoboForge.TNOIRC/config.json` with a **Libera (local)** profile using your cert.
+
+**Expected key layout** (any one of these in your keys folder):
+
+| Layout | Files |
+|--------|--------|
+| PKCS#12 (recommended) | `irc.pfx` or `irc.p12` |
+| PEM pair | `irc.crt` + `irc.key` (same folder) |
+
+Optional environment variables before running the script:
+
+```bash
+export KEYS_DIR=/home/wrath/Keys      # default
+export IRC_NICK=wrath                 # default
+export IRC_USER=wrath                 # default
+export IRC_CERT_PASSWORD=             # only if your .pfx is password-protected
+export TOR_SOCKS=9050                   # 9050 = system Tor, 9150 = Tor Browser
+./scripts/setup-local-linux.sh
+```
+
+**Start the app** after setup:
+
+```bash
+cd TNOIRC
+export PATH="$PATH:$HOME/.dotnet/tools"
+electronize start
+```
+
+First connect checklist:
+
+1. Tor running (`sudo systemctl start tor` or Tor Browser open)
+2. Connection window → profile **Libera (local)** → Connect
+3. New cert? Register with NickServ: `openssl x509 -in /home/wrath/Keys/irc.crt -outform DER | sha512sum` then `/msg NickServ CERT ADD <fingerprint>`
+
+---
+
+### 🔧 Run Locally (manual)
+
+```bash
+git clone https://github.com/LoboForge/TrustNoOneIRC.git
+cd TrustNoOneIRC/TNOIRC
+dotnet tool install ElectronNET.CLI -g
+export PATH="$PATH:$HOME/.dotnet/tools"
 electronize start
 ```
 
