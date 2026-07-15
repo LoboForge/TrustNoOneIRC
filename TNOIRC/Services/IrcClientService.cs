@@ -11,7 +11,7 @@ using LoboForge.TNOIRC.Models;
 
 public class IrcClientService
 {
-    const int MaxMessages = 300;
+    const int MaxMessages = 500;
     public List<string> ServerMessages { get; set; } = new();
     public List<IrcChannel> JoinedChannels { get; set; } = new();
     public List<IrcChannel> AvailableChannels { get; set; } = new();
@@ -22,6 +22,9 @@ public class IrcClientService
     public string Nick;
     public string User;
     public bool IsConnected { get; private set; }
+    public IrcConnectionState ConnectionState { get; private set; } = IrcConnectionState.Disconnected;
+
+    private readonly IrcConnectionOptions _options;
     private readonly bool _useTor;
     private readonly bool _useTls;
     private readonly bool _useSasl;
@@ -29,11 +32,15 @@ public class IrcClientService
     private readonly string? _saslPassword;
     private readonly string? _clientCertPath;
     private readonly string? _clientCertPassword;
+    private readonly string? _serverPassword;
 
     private TcpClient? _client;
     private StreamReader? _reader;
     private StreamWriter? _writer;
     private readonly IrcCommandDispatcher _dispatcher;
+    private CancellationTokenSource? _connectionCts;
+    private Task? _connectionTask;
+    private bool _manualDisconnect;
 
     public IrcClientService(
         string host,
@@ -49,41 +56,109 @@ public class IrcClientService
         User = user;
         _dispatcher = dispatcher;
 
-        options ??= new IrcConnectionOptions();
-        _useTor = options.UseTor;
-        _useTls = options.UseTls;
-        _useSasl = options.UseSasl;
-        _saslUsername = options.SaslUsername;
-        _saslPassword = options.SaslPassword;
-        _clientCertPath = options.ClientCertPath;
-        _clientCertPassword = options.ClientCertPassword;
+        _options = options ?? new IrcConnectionOptions();
+        _useTor = _options.UseTor;
+        _useTls = _options.UseTls;
+        _useSasl = _options.UseSasl;
+        _saslUsername = _options.SaslUsername;
+        _saslPassword = _options.SaslPassword;
+        _clientCertPath = _options.ClientCertPath;
+        _clientCertPassword = _options.ClientCertPassword;
+        _serverPassword = _options.ServerPassword;
     }
 
     public void StartService()
     {
-        _ = Task.Run(async () =>
+        _manualDisconnect = false;
+        _connectionCts = new CancellationTokenSource();
+        _connectionTask = Task.Run(() => RunConnectionLoopAsync(_connectionCts.Token));
+    }
+
+    private async Task RunConnectionLoopAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                await ConnectAsync(CancellationToken.None);
+                SetConnectionState(IrcConnectionState.Connecting, $"Connecting to {Host}:{Port}...");
+                await ConnectAsync(cancellationToken);
+                break;
+            }
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested && !_manualDisconnect && _options.AutoReconnect)
+            {
+                IsConnected = false;
+                SetConnectionState(IrcConnectionState.Reconnecting, ex.Message);
+                EventBus.Publish(new DisconnectedEvent(ex.Message, WillReconnect: true));
+                EventBus.Publish(new ServerMessage($"Connection failed: {ex.Message}. Retrying in {_options.ReconnectDelaySeconds}s..."));
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(_options.ReconnectDelaySeconds), cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[IRC] Connection failed: {ex.Message}");
+                IsConnected = false;
+                SetConnectionState(IrcConnectionState.Disconnected, ex.Message);
+                EventBus.Publish(new DisconnectedEvent(ex.Message, WillReconnect: false));
                 EventBus.Publish(new ServerMessage($"Connection failed: {ex.Message}"));
+                break;
             }
-        });
+        }
+    }
+
+    public async Task DisconnectAsync(string reason = "Leaving", bool reconnect = false)
+    {
+        _manualDisconnect = !reconnect;
+        _connectionCts?.Cancel();
+
+        try
+        {
+            if (_writer != null && IsConnected)
+                await _writer.WriteLineAsync(IrcCommands.Quit(reason));
+        }
+        catch { /* connection may already be dead */ }
+
+        CleanupConnection();
+        IsConnected = false;
+        SetConnectionState(IrcConnectionState.Disconnected, reason);
+        EventBus.Publish(new DisconnectedEvent(reason, WillReconnect: reconnect));
+    }
+
+    private void CleanupConnection()
+    {
+        try { _reader?.Dispose(); } catch { }
+        try { _writer?.Dispose(); } catch { }
+        try { _client?.Close(); } catch { }
+        _reader = null;
+        _writer = null;
+        _client = null;
+    }
+
+    private void SetConnectionState(IrcConnectionState state, string? message = null)
+    {
+        ConnectionState = state;
+        EventBus.Publish(new ConnectionStateChangedEvent(state, message));
     }
 
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
         IsConnected = false;
+        CleanupConnection();
+
         if (_useTor)
             await TorSocks5Helper.EnsureTorReadyAsync(cancellationToken);
 
         var stream = await EstablishConnectionAsync(cancellationToken);
         _reader = new StreamReader(stream, Encoding.UTF8);
         _writer = new StreamWriter(stream, Encoding.UTF8) { AutoFlush = true };
+
+        if (!string.IsNullOrWhiteSpace(_serverPassword))
+            await _writer.WriteLineAsync(IrcCommands.Pass(_serverPassword));
 
         if (_useSasl)
             await SaslAuthenticateAsync(cancellationToken);
@@ -116,25 +191,15 @@ public class IrcClientService
         if (!string.IsNullOrEmpty(_clientCertPath))
         {
             var cert = ClientCertificateLoader.Load(_clientCertPath, _clientCertPassword);
-            try
-            {
-                await ssl.AuthenticateAsClientAsync(
-                    new SslClientAuthenticationOptions
-                    {
-                        TargetHost = Host,
-                        ClientCertificates = new X509CertificateCollection { cert },
-                        EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
-                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck
-                    },
-                    cancellationToken);
-            }
-            catch (AuthenticationException ex)
-            {
-                Console.WriteLine($"[TLS] Client certificate authentication failed: {ex.Message}");
-                if (ex.InnerException != null)
-                    Console.WriteLine($"[TLS] Inner: {ex.InnerException.Message}");
-                throw;
-            }
+            await ssl.AuthenticateAsClientAsync(
+                new SslClientAuthenticationOptions
+                {
+                    TargetHost = Host,
+                    ClientCertificates = new X509CertificateCollection { cert },
+                    EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
+                    CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                },
+                cancellationToken);
         }
         else
         {
@@ -158,19 +223,24 @@ public class IrcClientService
             return;
 
         var useExternal = !string.IsNullOrEmpty(_clientCertPath);
-        var usePlain = !useExternal && !string.IsNullOrEmpty(_saslUsername);
+        var usePassword = !useExternal && !string.IsNullOrEmpty(_saslUsername);
 
-        if (!useExternal && !usePlain)
+        if (!useExternal && !usePassword)
             throw new InvalidOperationException("SASL is enabled but no client certificate or username was provided.");
 
         await _writer.WriteLineAsync("CAP LS 302");
 
         var saslAcknowledged = false;
+        var authLine = string.Empty;
+
         while (!saslAcknowledged)
         {
             var line = await ReadServerLineAsync(cancellationToken);
             if (line == null)
                 throw new InvalidOperationException("Connection closed during SASL capability negotiation.");
+
+            if (line.Contains("AUTH=", StringComparison.OrdinalIgnoreCase))
+                authLine = line;
 
             if (IsCapMessage(line, "LS"))
             {
@@ -188,14 +258,72 @@ public class IrcClientService
         if (useExternal)
         {
             await _writer.WriteLineAsync("AUTHENTICATE EXTERNAL");
+            await CompleteSaslExchangeAsync(cancellationToken);
         }
         else
         {
-            var credentials = $"\0{_saslUsername}\0{_saslPassword ?? string.Empty}";
-            var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials));
-            await _writer.WriteLineAsync($"AUTHENTICATE PLAIN {encoded}");
+            var username = _saslUsername!;
+            var supportsScram = authLine.Contains("SCRAM-SHA-256", StringComparison.OrdinalIgnoreCase);
+            if (supportsScram && !string.IsNullOrEmpty(_saslPassword))
+                await AuthenticateScramAsync(username, _saslPassword!, cancellationToken);
+            else
+                await AuthenticatePlainAsync(username, _saslPassword ?? string.Empty, cancellationToken);
         }
 
+        await _writer.WriteLineAsync("CAP END");
+        Console.WriteLine("[SASL] Authentication successful.");
+    }
+
+    private async Task AuthenticatePlainAsync(string username, string password, CancellationToken cancellationToken)
+    {
+        var credentials = $"\0{username}\0{password}";
+        var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentials));
+        await _writer!.WriteLineAsync($"AUTHENTICATE PLAIN {encoded}");
+        await CompleteSaslExchangeAsync(cancellationToken);
+    }
+
+    private async Task AuthenticateScramAsync(string username, string password, CancellationToken cancellationToken)
+    {
+        await _writer!.WriteLineAsync("AUTHENTICATE SCRAM-SHA-256");
+        var session = ScramSha256Helper.Start(username);
+
+        while (true)
+        {
+            var line = await ReadServerLineAsync(cancellationToken);
+            if (line == null)
+                throw new InvalidOperationException("Connection closed during SCRAM authentication.");
+
+            if (line.StartsWith("AUTHENTICATE +", StringComparison.OrdinalIgnoreCase))
+            {
+                var first = Convert.ToBase64String(Encoding.UTF8.GetBytes(ScramSha256Helper.ClientFirstMessage(session)));
+                await _writer.WriteLineAsync($"AUTHENTICATE {first}");
+                continue;
+            }
+
+            if (line.StartsWith("AUTHENTICATE ", StringComparison.OrdinalIgnoreCase))
+            {
+                var payload = line["AUTHENTICATE ".Length..].Trim();
+                if (payload == "+")
+                    continue;
+
+                var serverFirst = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
+                ScramSha256Helper.ParseServerFirst(session, serverFirst);
+                var clientFinal = ScramSha256Helper.BuildClientFinal(session, password);
+                var encodedFinal = Convert.ToBase64String(Encoding.UTF8.GetBytes(clientFinal));
+                await _writer.WriteLineAsync($"AUTHENTICATE {encodedFinal}");
+                continue;
+            }
+
+            if (line.Contains(" 903 ", StringComparison.Ordinal))
+                return;
+
+            if (line.Contains(" 904 ", StringComparison.Ordinal) || line.Contains(" 905 ", StringComparison.Ordinal))
+                throw new InvalidOperationException("SCRAM authentication failed.");
+        }
+    }
+
+    private async Task CompleteSaslExchangeAsync(CancellationToken cancellationToken)
+    {
         while (true)
         {
             var line = await ReadServerLineAsync(cancellationToken);
@@ -204,34 +332,26 @@ public class IrcClientService
 
             if (line.StartsWith("AUTHENTICATE +", StringComparison.OrdinalIgnoreCase))
             {
-                await _writer.WriteLineAsync("AUTHENTICATE +");
+                await _writer!.WriteLineAsync("AUTHENTICATE +");
                 continue;
             }
 
             if (line.Contains(" 903 ", StringComparison.Ordinal))
-                break;
+                return;
 
             if (line.Contains(" 904 ", StringComparison.Ordinal) || line.Contains(" 905 ", StringComparison.Ordinal))
                 throw new InvalidOperationException("SASL authentication failed.");
         }
-
-        await _writer.WriteLineAsync("CAP END");
-        Console.WriteLine("[SASL] Authentication successful.");
     }
 
     private async Task<string?> ReadServerLineAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var line = await _reader!.ReadLineAsync(cancellationToken);
-            if (line == null)
-                return null;
+        var line = await _reader!.ReadLineAsync(cancellationToken);
+        if (line == null)
+            return null;
 
-            Console.WriteLine($"[RAW] {line}");
-            return line;
-        }
-
-        return null;
+        Console.WriteLine($"[RAW] {line}");
+        return line;
     }
 
     private static bool IsCapMessage(string line, string subcommand) =>
@@ -251,7 +371,7 @@ public class IrcClientService
 
     private async Task SendNickUserAsync(CancellationToken cancellationToken)
     {
-        await _writer!.WriteLineAsync($"NICK {Nick}");
+        await _writer!.WriteLineAsync(IrcCommands.Nick(Nick));
         await _writer.WriteLineAsync($"USER {User} 0 * :{User}");
     }
 
@@ -278,9 +398,9 @@ public class IrcClientService
 
             if (message.Command == "001")
             {
-                Console.WriteLine("[IRC] Registration complete.");
                 registrationComplete = true;
                 IsConnected = true;
+                SetConnectionState(IrcConnectionState.Connected, message.Trailing);
 
                 var welcomeMessage = message.Trailing ?? "Welcome";
                 EventBus.Publish(new ConnectionCompletedEvent(welcomeMessage));
@@ -291,19 +411,28 @@ public class IrcClientService
             {
                 var token = message.Trailing ?? message.Parameters.FirstOrDefault();
                 if (token != null)
-                {
-                    Console.WriteLine($"[IRC] PONG :{token}");
                     await _writer!.WriteLineAsync(IrcCommands.Pong(token));
-                }
             }
 
             if (!registrationComplete && message.Command is "433" or "432")
             {
-                Console.WriteLine("[IRC] Nickname rejected; retrying once with suffix.");
                 Nick = $"{Nick}_";
                 await SendNickUserAsync(cancellationToken);
             }
         }
+
+        IsConnected = false;
+        CleanupConnection();
+
+        if (!_manualDisconnect && _options.AutoReconnect && !cancellationToken.IsCancellationRequested)
+        {
+            SetConnectionState(IrcConnectionState.Reconnecting, "Connection lost");
+            EventBus.Publish(new DisconnectedEvent("Connection lost", WillReconnect: true));
+            throw new IOException("Connection lost");
+        }
+
+        SetConnectionState(IrcConnectionState.Disconnected, "Disconnected");
+        EventBus.Publish(new DisconnectedEvent("Disconnected", WillReconnect: false));
     }
 
     public Task SendRawAsync(string rawLine)
@@ -326,7 +455,10 @@ public class IrcClientService
         var chatMessage = new ChatMessage(DateTime.UtcNow, myUser, target, content, isAction);
 
         if (isChannel)
-            JoinedChannels.FirstOrDefault(c => c.Name.Equals(target, StringComparison.OrdinalIgnoreCase))?.Messages.Add(chatMessage);
+        {
+            var channel = JoinedChannels.FirstOrDefault(c => c.Name.Equals(target, StringComparison.OrdinalIgnoreCase));
+            channel?.Messages.Add(chatMessage);
+        }
         else
         {
             var direct = DirectMessages.FirstOrDefault(c => c.Name.Equals(target, StringComparison.OrdinalIgnoreCase));
@@ -338,15 +470,44 @@ public class IrcClientService
             direct.Messages.Add(chatMessage);
         }
 
+        MessageLogService.AppendMessage(isChannel ? target : $"pm:{target}", chatMessage);
         return SendRawAsync(IrcCommands.PrivMsg(target, message));
     }
 
-    public Task JoinChannelAsync(string channel) => SendRawAsync(IrcCommands.Join(channel));
-    public Task PartChannelAsync(string channel, string message = "") => SendRawAsync(IrcCommands.Part(channel, message));
+    public async Task SyncChannelAsync(string channel)
+    {
+        await RequestNamesAsync(channel);
+        await RequestTopicAsync(channel);
+    }
+
+    public Task JoinChannelAsync(string channel, string? key = null) =>
+        SendRawAsync(IrcCommands.Join(channel, key));
+
+    public Task PartChannelAsync(string channel, string message = "") =>
+        SendRawAsync(IrcCommands.Part(channel, message));
+
     public Task QuitAsync(string reason = "Leaving") => SendRawAsync(IrcCommands.Quit(reason));
+
     public Task RequestNamesAsync(string channel) => SendRawAsync(IrcCommands.Names(channel));
+
     public Task RequestTopicAsync(string channel) => SendRawAsync(IrcCommands.Topic(channel));
-    public Task RequestChannelListAsync(string? filter = null) => SendRawAsync(IrcCommands.List());
-    public Task LeaveChannel(string target, string reason) => SendRawAsync($"PART {target} {reason}");
-    public Task SetModeAsync(string target, string mode) => SendRawAsync($"MODE {target} {mode}");
+
+    public Task SetTopicAsync(string channel, string topic) =>
+        SendRawAsync(IrcCommands.SetTopic(channel, topic));
+
+    public Task ChangeNickAsync(string newNick) => SendRawAsync(IrcCommands.Nick(newNick));
+
+    public Task WhoisAsync(string nick) => SendRawAsync(IrcCommands.Whois(nick));
+
+    public Task KickAsync(string channel, string nick, string? reason = null) =>
+        SendRawAsync(IrcCommands.Kick(channel, nick, reason));
+
+    public Task RequestChannelListAsync(string? filter = null) =>
+        SendRawAsync(IrcCommands.List(filter));
+
+    public Task LeaveChannel(string target, string reason) =>
+        SendRawAsync(IrcCommands.Part(target, reason));
+
+    public Task SetModeAsync(string target, string mode) =>
+        SendRawAsync(IrcCommands.Mode(target, mode));
 }

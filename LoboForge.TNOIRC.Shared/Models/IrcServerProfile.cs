@@ -12,11 +12,11 @@
         public bool UseSasl { get; set; } = false;
         public string SaslUsername { get; set; } = "";
         public string SaslPassword { get; set; } = "";
+        public string? ServerPassword { get; set; }
+        public bool AutoReconnect { get; set; } = true;
         public string? ClientCertPath { get; set; }
         public string? ClientCertPassword { get; set; }
         public bool UseClientCert { get; set; }
-        public List<string> AutoJoinChannels { get; set; }
+        public List<string> AutoJoinChannels { get; set; } = new();
     }
-
-
 }

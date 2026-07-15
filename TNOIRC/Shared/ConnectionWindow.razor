@@ -81,6 +81,18 @@
         }
 
         <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" id="autoReconnect" @bind="SelectedServer.AutoReconnect">
+            <label class="form-check-label" for="autoReconnect">Auto-reconnect on disconnect</label>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-6">
+                <label class="form-label">Server Password (PASS)</label>
+                <input type="password" class="form-control" @bind="SelectedServer.ServerPassword" />
+            </div>
+        </div>
+
+        <div class="form-check form-switch mt-3">
             <input class="form-check-input" type="checkbox" id="useCert" @bind="SelectedServer.UseClientCert">
             <label class="form-check-label" for="useCert">Use Client Certificate (TLS + SASL EXTERNAL)</label>
         </div>
@@ -121,10 +133,16 @@
             </div>
         }
 
-        <div class="mt-4 d-flex gap-3">
-            <button class="btn btn-primary" @onclick="Connect">🔌 Connect</button>
+        <div class="mt-4 d-flex gap-3 flex-wrap">
+            <button class="btn btn-primary" @onclick="Connect" disabled="@Common.IsConnected">🔌 Connect</button>
+            <button class="btn btn-warning" @onclick="Disconnect" disabled="@(!Common.IsConnected)">⏏ Disconnect</button>
             <button class="btn btn-outline-secondary" @onclick="SaveProfile">💾 Save</button>
         </div>
+
+        @if (Common.IsConnected)
+        {
+            <p class="text-success mt-2 mb-0">Connected to @Common.ircClient.Host as @Common.ircClient.Nick</p>
+        }
     }
 </div>
 
@@ -171,10 +189,13 @@
         ConfigService.Save();
     }
 
-    private void Connect()
+    private async Task Connect()
     {
         var s = SelectedServer;
         if (s == null) return;
+
+        if (Common.IsConnected)
+            await Common.ircClient.DisconnectAsync("Switching servers", reconnect: false);
 
         if (s.UseClientCert)
         {
@@ -190,7 +211,9 @@
             SaslUsername = s.SaslUsername,
             SaslPassword = s.SaslPassword,
             ClientCertPath = s.UseClientCert ? s.ClientCertPath : null,
-            ClientCertPassword = s.UseClientCert ? s.ClientCertPassword : null
+            ClientCertPassword = s.UseClientCert ? s.ClientCertPassword : null,
+            ServerPassword = s.ServerPassword,
+            AutoReconnect = s.AutoReconnect
         };
 
         Common.ircClient = new IrcClientService(
@@ -204,6 +227,12 @@
 
         ConfigService.Save();
         Common.ircClient.StartService();
+    }
+
+    private async Task Disconnect()
+    {
+        if (Common.IsConnected)
+            await Common.ircClient.DisconnectAsync("User disconnect", reconnect: false);
     }
 
     protected virtual void Dispose(bool disposing)

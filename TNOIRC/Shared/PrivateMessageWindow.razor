@@ -1,5 +1,6 @@
 ﻿@using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
+@using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
 @implements IDisposable
 @inject IJSRuntime JSRuntime
@@ -75,6 +76,12 @@ else
     {
         if (!Common.IsConnected || string.IsNullOrWhiteSpace(CurrentMessage))
             return;
+
+        if (await IrcSlashCommandService.TryHandleAsync(CurrentMessage))
+        {
+            CurrentMessage = "";
+            return;
+        }
 
         await Common.ircClient.SendMessageAsync(Conversation.User.Nick, CurrentMessage);
         Conversation.Messages.Add(new ChatMessage(

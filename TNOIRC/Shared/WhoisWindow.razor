@@ -1,0 +1,36 @@
+@using LoboForge.TNOIRC.Models
+@implements IDisposable
+
+<div class="whois-window p-2">
+    <h5>WHOIS: @Nick</h5>
+    <div class="whois-lines" style="font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto;">
+        @foreach (var line in Lines)
+        {
+            <div>@line</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Nick { get; set; } = "";
+    [Parameter] public List<string> Lines { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        EventBus.Subscribe<WhoisInfoEvent>(OnWhoisUpdate);
+    }
+
+    private void OnWhoisUpdate(WhoisInfoEvent evt)
+    {
+        if (!evt.Nick.Equals(Nick, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        Lines = evt.Lines.ToList();
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        EventBus.Unsubscribe<WhoisInfoEvent>(OnWhoisUpdate);
+    }
+}

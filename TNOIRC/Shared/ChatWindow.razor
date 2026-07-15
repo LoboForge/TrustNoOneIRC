@@ -1,5 +1,6 @@
 ﻿@using LoboForge.TNOIRC
 @using LoboForge.TNOIRC.Models
+@using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
 @implements IDisposable
 @inject IJSRuntime JSRuntime
@@ -11,19 +12,45 @@
 else
 {
     <div class="chat-window-content d-flex flex-column">
+        @if (!string.IsNullOrWhiteSpace(Channel.Topic) || _editingTopic)
+        {
+            <div class="chat-topic d-flex align-items-center gap-2">
+                @if (_editingTopic)
+                {
+                    <input class="form-control form-control-sm flex-grow-1"
+                           @bind="_topicDraft"
+                           @onkeydown="HandleTopicKey" />
+                    <button class="btn btn-sm btn-primary" @onclick="SaveTopic">Set</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="() => _editingTopic = false">Cancel</button>
+                }
+                else
+                {
+                    <span class="flex-grow-1">@Channel.Topic</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="BeginEditTopic" disabled="@(!Common.IsConnected)">Edit</button>
+                }
+            </div>
+        }
+        else if (Common.IsConnected)
+        {
+            <div class="chat-topic">
+                <span class="text-muted">No topic set.</span>
+                <button class="btn btn-sm btn-outline-secondary ms-2" @onclick="BeginEditTopic">Set topic</button>
+            </div>
+        }
+
         <div class="flex-grow-1 d-flex overflow-hidden">
             @if (ShowUserList)
             {
                 <div class="user-list">
                     @foreach (var user in Channel.Users.OrderBy(u => u.Nick))
                     {
-                        <div class="user-entry" @onclick="() => StartPm(user)">
-                            @user.Nick
+                        <div class="user-entry" @onclick="() => StartPm(user)" @oncontextmenu:preventDefault @oncontextmenu="() => Whois(user)">
+                            <span class="user-prefix">@user.Prefix</span>@user.Nick
                             @if (user.HostIsIP())
                             {
-                                <span title="Lookup IP" style="cursor:pointer; margin-left:6px;"
+                                <span title="WHOIS" style="cursor:pointer; margin-left:6px;"
                                       @onclick:stopPropagation
-                                      @onclick="() => RaiseIpLookup(user)">
+                                      @onclick="() => Whois(user)">
                                     🔍
                                 </span>
                             }
@@ -35,6 +62,7 @@ else
             <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
                 @foreach (var msg in Channel.Messages)
                 {
+                    var highlight = msg.Content.Contains(Common.ircClient.Nick, StringComparison.OrdinalIgnoreCase);
                     if (msg.IsNotice)
                     {
                         <div class="chat-message notice-msg">
@@ -44,16 +72,10 @@ else
                     }
                     else if (!msg.IsAction)
                     {
-                        <div class="chat-message">
+                        <div class="chat-message @(highlight ? "highlight-msg" : "")">
                             <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
                             <span class="user">@msg.Sender.Nick:</span>
-                            <span class="text">
-                                @foreach (var line in msg.Content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
-                                {
-                                    @line
-                                    <br />
-                                }
-                            </span>
+                            <span class="text">@RenderContent(msg.Content)</span>
                         </div>
                     }
                     else
@@ -66,16 +88,26 @@ else
                 }
             </div>
         </div>
-        <div style="position:absolute; bottom:50px; left:10px; width:90%; background-color:transparent;">
+
+        <div class="chat-controls">
             <button @onclick="ToggleUserList">👥</button>
+            <button @onclick="RefreshChannel" disabled="@(!Common.IsConnected)">↻</button>
         </div>
+
         <div class="chat-input mt-1">
             <input type="text"
+                   list="nick-suggestions-@ChannelId"
                    @bind-value="CurrentMessage"
                    @bind-value:event="oninput"
                    @onkeydown="HandleKey"
-                   placeholder="Type your message..."
+                   placeholder="Message or /command..."
                    disabled="@(!Common.IsConnected)" />
+            <datalist id="nick-suggestions-@ChannelId">
+                @foreach (var user in Channel.Users)
+                {
+                    <option value="@user.Nick">@user.DisplayNick</option>
+                }
+            </datalist>
             <button @onclick="SendMessage" disabled="@(!Common.IsConnected)">Send</button>
         </div>
     </div>
@@ -83,44 +115,92 @@ else
 
 @code {
     [Parameter] public IrcChannel Channel { get; set; } = default!;
-    [Parameter] public EventCallback OnClose { get; set; }
 
     private string CurrentMessage = "";
+    private string _topicDraft = "";
+    private bool _editingTopic;
     private ElementReference MessagesDiv;
     private bool ShowUserList = true;
+    private string ChannelId => Channel?.Name?.Replace("#", "").Replace("&", "") ?? "chan";
 
     private Action<ChannelMessageReceivedEvent>? _messageHandler;
     private Action<UserJoinedEvent>? _joinHandler;
+    private Action<ChannelTopicEvent>? _topicHandler;
+    private Action<UserNickChangedEvent>? _nickHandler;
 
     protected override void OnInitialized()
     {
         _messageHandler = HandleNewMessage;
         _joinHandler = HandleUserJoined;
+        _topicHandler = HandleTopicChanged;
+        _nickHandler = HandleNickChanged;
+
         EventBus.Subscribe<ChannelMessageReceivedEvent>(_messageHandler);
         EventBus.Subscribe<UserJoinedEvent>(_joinHandler);
+        EventBus.Subscribe<ChannelTopicEvent>(_topicHandler);
+        EventBus.Subscribe<UserNickChangedEvent>(_nickHandler);
+    }
+
+    private MarkupString RenderContent(string content)
+    {
+        var encoded = System.Net.WebUtility.HtmlEncode(content);
+        encoded = System.Text.RegularExpressions.Regex.Replace(
+            encoded,
+            @"(https?://[^\s<]+)",
+            "<a href=\"$1\" target=\"_blank\" rel=\"noopener\">$1</a>");
+        encoded = encoded.Replace("\n", "<br/>", StringComparison.Ordinal);
+        return new MarkupString(encoded);
     }
 
     private async void HandleUserJoined(UserJoinedEvent evt)
     {
         if (!string.Equals(evt.Channel, Channel.Name, StringComparison.OrdinalIgnoreCase))
             return;
-
         await InvokeAsync(StateHasChanged);
     }
 
-    private void RaiseIpLookup(IrcUser user)
+    private async void HandleTopicChanged(ChannelTopicEvent evt)
     {
-        EventBus.Publish(new UserIpLookupRequestedEvent(user, Channel.Name));
+        if (!string.Equals(evt.Channel, Channel.Name, StringComparison.OrdinalIgnoreCase))
+            return;
+        Channel.Topic = evt.Topic ?? string.Empty;
+        await InvokeAsync(StateHasChanged);
     }
 
-    private void StartPm(IrcUser user)
+    private async void HandleNickChanged(UserNickChangedEvent evt)
     {
-        EventBus.Publish(new RequestPrivateMessageEvent(user));
+        await InvokeAsync(StateHasChanged);
     }
 
-    private void ToggleUserList()
+    private void Whois(IrcUser user) => EventBus.Publish(new UserIpLookupRequestedEvent(user, Channel.Name));
+
+    private void StartPm(IrcUser user) => EventBus.Publish(new RequestPrivateMessageEvent(user));
+
+    private void ToggleUserList() => ShowUserList = !ShowUserList;
+
+    private async Task RefreshChannel()
     {
-        ShowUserList = !ShowUserList;
+        await Common.ircClient.SyncChannelAsync(Channel.Name);
+    }
+
+    private void BeginEditTopic()
+    {
+        _topicDraft = Channel.Topic ?? string.Empty;
+        _editingTopic = true;
+    }
+
+    private async Task SaveTopic()
+    {
+        await Common.ircClient.SetTopicAsync(Channel.Name, _topicDraft);
+        _editingTopic = false;
+    }
+
+    private async Task HandleTopicKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await SaveTopic();
+        if (e.Key == "Escape")
+            _editingTopic = false;
     }
 
     private async void HandleNewMessage(ChannelMessageReceivedEvent evt)
@@ -152,6 +232,12 @@ else
         if (!Common.IsConnected || string.IsNullOrWhiteSpace(CurrentMessage))
             return;
 
+        if (await IrcSlashCommandService.TryHandleAsync(CurrentMessage, Channel.Name))
+        {
+            CurrentMessage = "";
+            return;
+        }
+
         await Common.ircClient.SendMessageAsync(Channel.Name, CurrentMessage);
         CurrentMessage = "";
     }
@@ -169,9 +255,9 @@ else
 
     public void Dispose()
     {
-        if (_messageHandler != null)
-            EventBus.Unsubscribe<ChannelMessageReceivedEvent>(_messageHandler);
-        if (_joinHandler != null)
-            EventBus.Unsubscribe<UserJoinedEvent>(_joinHandler);
+        if (_messageHandler != null) EventBus.Unsubscribe<ChannelMessageReceivedEvent>(_messageHandler);
+        if (_joinHandler != null) EventBus.Unsubscribe<UserJoinedEvent>(_joinHandler);
+        if (_topicHandler != null) EventBus.Unsubscribe<ChannelTopicEvent>(_topicHandler);
+        if (_nickHandler != null) EventBus.Unsubscribe<UserNickChangedEvent>(_nickHandler);
     }
 }

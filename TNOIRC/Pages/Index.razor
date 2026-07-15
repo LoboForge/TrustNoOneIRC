@@ -9,6 +9,10 @@
 <div class="desktop">
     <ToastContainer></ToastContainer>
 
+    <div class="connection-status @ConnectionStatusClass">
+        @ConnectionStatusText
+    </div>
+
     @foreach (var window in OpenWindows)
     {
         <HackerWindow Title="@window.Title"
@@ -85,6 +89,8 @@
 @code {
     private List<Window> OpenWindows = new();
     private readonly List<PrivateConversation> PMs = new();
+    private string ConnectionStatusText = "Disconnected";
+    private string ConnectionStatusClass = "status-disconnected";
 
     protected override void OnInitialized()
     {
@@ -105,33 +111,85 @@
         EventBus.Subscribe<UserJoinedEvent>(HandleUserJoined);
         EventBus.Subscribe<UserIpLookupRequestedEvent>(HandleUserIpLookup);
         EventBus.Subscribe<ConnectionCompletedEvent>(HandleConnectionCompleted);
+        EventBus.Subscribe<ConnectionStateChangedEvent>(HandleConnectionStateChanged);
+        EventBus.Subscribe<KickedFromChannelEvent>(HandleKicked);
+        EventBus.Subscribe<ErrorEvent>(HandleError);
+        EventBus.Subscribe<DisconnectedEvent>(HandleDisconnected);
+        EventBus.Subscribe<WhoisInfoEvent>(HandleWhoisInfo);
+    }
+
+    private void HandleConnectionStateChanged(ConnectionStateChangedEvent evt)
+    {
+        ConnectionStatusText = evt.Message ?? evt.State.ToString();
+        ConnectionStatusClass = evt.State switch
+        {
+            IrcConnectionState.Connected => "status-connected",
+            IrcConnectionState.Connecting => "status-connecting",
+            IrcConnectionState.Reconnecting => "status-reconnecting",
+            _ => "status-disconnected"
+        };
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleKicked(KickedFromChannelEvent evt)
+    {
+        if (!evt.kickedUser.Equals(Common.ircClient.Nick, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        ToastService.Show($"You were kicked from {evt.channel}: {evt.reason}", ToastLevel.Warning);
+        OpenWindows.RemoveAll(w => w.Title.Equals(evt.channel, StringComparison.OrdinalIgnoreCase));
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleError(ErrorEvent evt)
+    {
+        ToastService.Show($"Server error: {evt.Reason}", ToastLevel.Error);
+    }
+
+    private void HandleDisconnected(DisconnectedEvent evt)
+    {
+        if (!evt.WillReconnect)
+            ConnectionStatusText = evt.Reason ?? "Disconnected";
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleWhoisInfo(WhoisInfoEvent evt)
+    {
+        if (!evt.Complete)
+            return;
+
+        var title = $"WHOIS: {evt.Nick}";
+        if (!OpenWindows.Any(w => w.Title == title))
+        {
+            var lines = evt.Lines.ToList();
+            OpenWindows.Add(new Window
+            {
+                Title = title,
+                Type = WindowType.IpWhois,
+                ChildContent = builder =>
+                {
+                    builder.OpenComponent(0, typeof(WhoisWindow));
+                    builder.AddAttribute(1, "Nick", evt.Nick);
+                    builder.AddAttribute(2, "Lines", lines);
+                    builder.CloseComponent();
+                }
+            });
+        }
+        InvokeAsync(StateHasChanged);
+    }
+    private async void HandleUserIpLookup(UserIpLookupRequestedEvent evt)
+    {
+        if (!Common.IsConnected)
+            return;
+
+        await Common.ircClient.WhoisAsync(evt.User.Nick);
     }
 
     private void HandleConnectionCompleted(ConnectionCompletedEvent evt)
     {
+        ConnectionStatusText = $"Connected to {Common.ircClient.Host} as {Common.ircClient.Nick}";
+        ConnectionStatusClass = "status-connected";
         InvokeAsync(StateHasChanged);
-    }
-    private void HandleUserIpLookup(UserIpLookupRequestedEvent evt)
-    {
-@*         var title = $"IPWhois: {evt.User.Nick}";
-        // Don't open if it's already open (by IP or nick)
-        if (OpenWindows.Any(w => w.Title == title))
-            return;
-
-        var fragment = new RenderFragment(builder =>
-        {
-            builder.OpenComponent(0, typeof(IpWhoIsWindow));
-            builder.AddAttribute(1, "User", evt.User);
-            builder.CloseComponent();
-        });
-
-        OpenWindows.Add(new Window
-        {
-            Title = title,
-            Type = WindowType.IpWhois, // Add this type to your WindowType enum!
-            ChildContent = fragment
-        });
-        StateHasChanged(); *@
     }
 
     private void HandleChannelMessage(ChannelMessageReceivedEvent evt)
@@ -612,6 +670,11 @@
         EventBus.Unsubscribe<UserJoinedEvent>(HandleUserJoined);
         EventBus.Unsubscribe<UserIpLookupRequestedEvent>(HandleUserIpLookup);
         EventBus.Unsubscribe<ConnectionCompletedEvent>(HandleConnectionCompleted);
+        EventBus.Unsubscribe<ConnectionStateChangedEvent>(HandleConnectionStateChanged);
+        EventBus.Unsubscribe<KickedFromChannelEvent>(HandleKicked);
+        EventBus.Unsubscribe<ErrorEvent>(HandleError);
+        EventBus.Unsubscribe<DisconnectedEvent>(HandleDisconnected);
+        EventBus.Unsubscribe<WhoisInfoEvent>(HandleWhoisInfo);
     }
 
 }

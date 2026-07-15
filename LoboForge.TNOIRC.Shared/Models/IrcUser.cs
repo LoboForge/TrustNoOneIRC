@@ -9,12 +9,17 @@ public class IrcUser
     public string Username { get; set; }
     public string Hostname { get; set; }
     public string Host { get; set; }
-    public IrcUser(string nickname, string username = "", string hostname = "", string host = "")
+    public string Prefix { get; set; } = "";
+
+    public string DisplayNick => $"{Prefix}{Nick}";
+
+    public IrcUser(string nickname, string username = "", string hostname = "", string host = "", string prefix = "")
     {
         Nick = nickname;
         Username = username;
         Hostname = hostname;
         Host = host;
+        Prefix = prefix;
     }
 
     public static IrcUser FromPrefix(string prefix)

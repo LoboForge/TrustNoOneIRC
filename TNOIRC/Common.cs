@@ -26,6 +26,7 @@ namespace LoboForge.TNOIRC
             new NameReplyHandler(),
             new NoTopicHandler(),
             new ErrorHandler(),
+            new WhoisReplyHandler(),
         });
 
         public static bool IsConnected => ircClient.IsConnected;
