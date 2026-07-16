@@ -17,9 +17,13 @@ echo "    Config:   $CONFIG_FILE"
 echo
 
 if [[ ! -d "$KEYS_DIR" ]]; then
-  echo "ERROR: Keys directory not found: $KEYS_DIR"
-  echo "Create it or set KEYS_DIR=/path/to/keys"
-  exit 1
+  echo "==> Creating keys directory: $KEYS_DIR"
+  if [[ "$KEYS_DIR" == /home/*/* ]]; then
+    sudo mkdir -p "$KEYS_DIR" 2>/dev/null || mkdir -p "$KEYS_DIR"
+    sudo chown -R "$(whoami):$(id -gn)" "$(dirname "$KEYS_DIR")" 2>/dev/null || true
+  else
+    mkdir -p "$KEYS_DIR"
+  fi
 fi
 
 echo "==> Keys in $KEYS_DIR:"
@@ -95,27 +99,56 @@ if [[ ${#missing[@]} -gt 0 ]]; then
   fi
 fi
 
-# Tor
-if command -v systemctl >/dev/null 2>&1; then
-  if systemctl is-active --quiet tor 2>/dev/null; then
-    echo "==> Tor service: running"
+# Tor (systemd when available, otherwise start tor directly)
+socks_up() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -tln 2>/dev/null | grep -qE ':9050|:9150'
+  elif command -v netstat >/dev/null 2>&1; then
+    netstat -tln 2>/dev/null | grep -qE ':9050|:9150'
   else
-    echo "==> Starting Tor..."
-    sudo systemctl enable --now tor 2>/dev/null || echo "WARN: could not start tor — run: sudo systemctl start tor"
+    python3 -c "import socket; s=socket.socket(); r=s.connect_ex(('127.0.0.1',9050)); s.close(); exit(0 if r==0 else 1)" 2>/dev/null
   fi
+}
+
+if socks_up; then
+  echo "==> SOCKS proxy already listening (9050 or 9150)"
+elif command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet tor 2>/dev/null; then
+  echo "==> Tor service: running"
+elif command -v tor >/dev/null 2>&1; then
+  echo "==> Starting Tor daemon..."
+  tor --RunAsDaemon 1 2>/dev/null || sudo systemctl start tor 2>/dev/null || true
+  sleep 2
 fi
 
-if ss -tln 2>/dev/null | grep -qE ':9050|:9150'; then
+if socks_up; then
   echo "==> SOCKS proxy listening (9050 or 9150)"
 else
   echo "WARN: No SOCKS on 9050/9150 — start Tor or Tor Browser before connecting"
 fi
 
-# Electron.NET CLI
+# Electron.NET CLI (requires .NET 6 runtime for the global tool)
+export PATH="$PATH:$HOME/.dotnet/tools"
+if ! dotnet --list-runtimes 2>/dev/null | grep -q "Microsoft.NETCore.App 6."; then
+  echo "==> Installing .NET 6 runtime (required by electronize CLI)..."
+  curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+  bash /tmp/dotnet-install.sh --runtime dotnet --version 6.0.36
+  export PATH="$PATH:$HOME/.dotnet"
+fi
+
 if ! command -v electronize >/dev/null 2>&1; then
   echo "==> Installing ElectronNET.CLI..."
   dotnet tool install ElectronNET.CLI -g
-  export PATH="$PATH:$HOME/.dotnet/tools"
+fi
+
+# electronize publish fails when TNOIRC/ contains multiple .sln files
+if [[ -f "$REPO_ROOT/TNOIRC/TNOIRC.sln" ]]; then
+  mv "$REPO_ROOT/TNOIRC/TNOIRC.sln" "$REPO_ROOT/TNOIRC/TNOIRC.sln.bak"
+  echo "==> Renamed TNOIRC/TNOIRC.sln → TNOIRC.sln.bak (avoids electronize publish conflict)"
+fi
+
+if [[ ! -d "$REPO_ROOT/TNOIRC/node_modules" ]]; then
+  echo "==> Installing npm dependencies for Electron shell..."
+  (cd "$REPO_ROOT/TNOIRC" && npm install)
 fi
 
 # Build
@@ -168,7 +201,7 @@ echo "==> Wrote $CONFIG_FILE"
 echo
 echo "==> Done. Start the app:"
 echo "    cd $REPO_ROOT/TNOIRC"
-echo "    export PATH=\"\$PATH:\$HOME/.dotnet/tools\""
+echo "    export PATH=\"\$PATH:\$HOME/.dotnet/tools:\$HOME/.dotnet\""
 echo "    electronize start"
 echo
 echo "==> In the app:"
