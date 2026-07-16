@@ -1,31 +1,33 @@
-﻿
-<div class="irc-log">
-    @{ 
+﻿@using LoboForge.TNOIRC
+@implements IDisposable
 
-        foreach (var message in Messages)
-        {
-            <div class="log-line">@message</div>
-        }
+<div class="irc-log">
+    @foreach (var message in Messages)
+    {
+        <div class="log-line">@message</div>
     }
 </div>
 
 @code {
-    List<string> Messages = Common.ircClient.ServerMessages.ToList();
+    private List<string> Messages { get; set; } = new();
+    private Action<ServerMessage>? _messageHandler;
 
     protected override void OnInitialized()
     {
-        
-        EventBus.Subscribe<ServerMessage>(HandleMessage);
+        Messages = Common.ircClient?.ServerMessages.ToList() ?? new List<string>();
+        _messageHandler = HandleMessage;
+        EventBus.Subscribe<ServerMessage>(_messageHandler);
     }
 
     private void HandleMessage(ServerMessage message)
     {
-        Messages = Common.ircClient.ServerMessages.ToList();
-        InvokeAsync(StateHasChanged); // trigger UI refresh
+        Messages = Common.ircClient?.ServerMessages.ToList() ?? new List<string>();
+        InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
     {
-        EventBus.Unsubscribe<ServerMessage>(HandleMessage);
+        if (_messageHandler != null)
+            EventBus.Unsubscribe<ServerMessage>(_messageHandler);
     }
 }

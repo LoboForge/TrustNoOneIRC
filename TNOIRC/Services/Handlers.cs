@@ -42,6 +42,7 @@ namespace LoboForge.TNOIRC.Commands
                 if (channel != null)
                 {
                     channel.Messages.Add(chatMessage);
+                    MessageLogService.AppendMessage(target, chatMessage);
                 }
 
                 EventBus.Publish(new ChannelMessageReceivedEvent(sender, target, content, isAction));
@@ -56,6 +57,7 @@ namespace LoboForge.TNOIRC.Commands
                     Common.ircClient.DirectMessages.Add(new IrcChannel { Name = sender.Nick });
 
                 EventBus.Publish(new PrivateMessageReceivedEvent(sender, chatMessage, isAction));
+                MessageLogService.AppendMessage($"pm:{sender.Nick}", chatMessage);
             }
         }
     }
@@ -100,6 +102,8 @@ namespace LoboForge.TNOIRC.Commands
                 }
 
                 EventBus.Publish(new SelfJoinedChannelEvent(user, channel));
+                MessageLogService.HydrateChannel(existing!);
+                _ = Common.ircClient.SyncChannelAsync(channel);
             }
             else
             {
@@ -239,10 +243,15 @@ namespace LoboForge.TNOIRC.Commands
 
             foreach (var rawNick in nickList)
             {
-                var cleanNick = rawNick.TrimStart('@', '+', '~', '&', '%');
-                if (!channel.Users.Any(u => u.Nick.Equals(cleanNick, StringComparison.OrdinalIgnoreCase)))
+                var (prefix, cleanNick) = IrcNickPrefix.Parse(rawNick.Trim());
+                var existingUser = channel.Users.FirstOrDefault(u => u.Nick.Equals(cleanNick, StringComparison.OrdinalIgnoreCase));
+                if (existingUser == null)
                 {
-                    channel.Users.Add(new IrcUser(cleanNick));
+                    channel.Users.Add(new IrcUser(cleanNick, prefix: prefix));
+                }
+                else
+                {
+                    existingUser.Prefix = prefix;
                 }
             }
 
@@ -276,8 +285,7 @@ namespace LoboForge.TNOIRC.Commands
 
         public void Handle(IrcMessage message)
         {
-            var welcome = message.Trailing ?? "";
-            EventBus.Publish(new ConnectionCompletedEvent(welcome));
+            // ConnectionCompletedEvent is published by IrcClientService after full registration.
         }
     }
     public class ChannelListHandler : IIrcCommandHandler
@@ -333,6 +341,11 @@ namespace LoboForge.TNOIRC.Commands
             var channel = message.Parameters[1];
             var topic = message.Trailing ?? "";
 
+            var chan = Common.ircClient.JoinedChannels
+                .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
+            if (chan != null)
+                chan.Topic = topic;
+
             EventBus.Publish(new ChannelTopicEvent(channel, topic));
         }
     }
@@ -346,6 +359,11 @@ namespace LoboForge.TNOIRC.Commands
                 return;
 
             var channel = message.Parameters[1];
+            var chan = Common.ircClient.JoinedChannels
+                .FirstOrDefault(c => string.Equals(c.Name, channel, StringComparison.OrdinalIgnoreCase));
+            if (chan != null)
+                chan.Topic = string.Empty;
+
             EventBus.Publish(new ChannelTopicEvent(channel, Topic: null));
         }
     }
@@ -395,6 +413,16 @@ namespace LoboForge.TNOIRC.Commands
 
             var oldUser = IrcUser.FromPrefix(message.Prefix);
             var newNick = message.Trailing;
+
+            foreach (var chan in Common.ircClient.JoinedChannels)
+            {
+                var member = chan.Users.FirstOrDefault(u => u.Nick.Equals(oldUser.Nick, StringComparison.OrdinalIgnoreCase));
+                if (member != null)
+                    member.Nick = newNick;
+            }
+
+            if (oldUser.Nick.Equals(Common.ircClient.Nick, StringComparison.OrdinalIgnoreCase))
+                Common.ircClient.Nick = newNick;
 
             EventBus.Publish(new UserNickChangedEvent(oldUser, newNick));
         }
@@ -496,9 +524,45 @@ namespace LoboForge.TNOIRC.Commands
             }
             EventBus.Publish(new KickedFromChannelEvent(kicker, channel, kickedUser, reason));
 
+            if (kickedUser.Equals(Common.ircClient.Nick, StringComparison.OrdinalIgnoreCase))
+            {
+                Common.ircClient.JoinedChannels.RemoveAll(c =>
+                    c.Name.Equals(channel, StringComparison.OrdinalIgnoreCase));
+            }
         }
     }
 
+    public class WhoisReplyHandler : IIrcCommandHandler
+    {
+        private readonly List<string> _lines = new();
+        private string _nick = string.Empty;
 
+        public bool CanHandle(string command) =>
+            command is "311" or "312" or "313" or "317" or "318" or "319" or "401";
 
+        public void Handle(IrcMessage message)
+        {
+            if (message.Command == "401")
+            {
+                var nick = message.Parameters.Count > 1 ? message.Parameters[1] : "unknown";
+                EventBus.Publish(new WhoisInfoEvent(nick, new[] { message.Trailing ?? "No such nick." }, Complete: true));
+                _lines.Clear();
+                return;
+            }
+
+            if (message.Command == "311" && message.Parameters.Count > 1)
+            {
+                _lines.Clear();
+                _nick = message.Parameters[1];
+            }
+
+            _lines.Add(message.Raw);
+
+            if (message.Command == "318")
+            {
+                EventBus.Publish(new WhoisInfoEvent(_nick, _lines.ToList(), Complete: true));
+                _lines.Clear();
+            }
+        }
+    }
 }

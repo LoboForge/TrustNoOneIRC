@@ -1,0 +1,173 @@
+@using LoboForge.TNOIRC.Services
+@using LoboForge.TNOIRC.Models
+@inject PasteShareService PasteShare
+@inject ToastService Toast
+@implements IDisposable
+
+<div class="share-window p-3 d-flex flex-column gap-3">
+    <p class="text-muted small mb-0">
+        Uploads route through Tor SOCKS (<code>socks5h://127.0.0.1:@TorSocks5Helper.SocksPort</code>).
+        No DCC — links only, no peer-to-peer IP exposure.
+    </p>
+
+    <ul class="nav nav-tabs">
+        <li class="nav-item">
+            <button type="button" class="nav-link @(ActiveTab == "text" ? "active" : "")" @onclick='() => ActiveTab = "text"'>Text paste</button>
+        </li>
+        <li class="nav-item">
+            <button type="button" class="nav-link @(ActiveTab == "image" ? "active" : "")" @onclick='() => ActiveTab = "image"'>Image</button>
+        </li>
+    </ul>
+
+    @if (ActiveTab == "text")
+    {
+        <textarea class="form-control" rows="10" @bind="PasteText" placeholder="Paste text to upload via paste.rs..."></textarea>
+        <button class="btn btn-primary" @onclick="UploadText" disabled="@IsUploading">Upload text</button>
+    }
+    else
+    {
+        <InputFile OnChange="OnImageSelected" accept="image/*" />
+        @if (!string.IsNullOrWhiteSpace(SelectedImageName))
+        {
+            <small class="text-muted">Selected: @SelectedImageName (@SelectedImageSize bytes)</small>
+        }
+        <button class="btn btn-primary" @onclick="UploadImage" disabled="@(IsUploading || _imageStream == null)">Upload image</button>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(StatusMessage))
+    {
+        <div class="alert @(StatusIsError ? "alert-danger" : "alert-info") mb-0">@StatusMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(LastUrl))
+    {
+        <div class="input-group">
+            <input class="form-control" readonly value="@LastUrl" />
+            <button class="btn btn-outline-secondary" @onclick="CopyUrl">Copy</button>
+            <button class="btn btn-success" @onclick="SendUrlToChannel" disabled="@(!CanSend)">Send to IRC</button>
+        </div>
+        <input class="form-control" @bind="TargetChannel" placeholder="#channel or nick (defaults to context channel)" />
+    }
+</div>
+
+@code {
+    [Parameter] public string? TargetChannel { get; set; }
+    [Parameter] public string? PrefillText { get; set; }
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private string ActiveTab = "text";
+    private string PasteText = "";
+    private string? LastUrl;
+    private string? StatusMessage;
+    private bool StatusIsError;
+    private bool IsUploading;
+    private string? SelectedImageName;
+    private long SelectedImageSize;
+    private MemoryStream? _imageStream;
+    private string? _imageContentType;
+
+    private bool CanSend => Common.IsConnected && !string.IsNullOrWhiteSpace(LastUrl) && !string.IsNullOrWhiteSpace(ResolveTarget());
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(PrefillText))
+            PasteText = PrefillText;
+    }
+
+    private async Task UploadText()
+    {
+        IsUploading = true;
+        StatusMessage = "Uploading via Tor...";
+        StatusIsError = false;
+        StateHasChanged();
+
+        var result = await PasteShare.UploadTextAsync(PasteText);
+        IsUploading = false;
+
+        if (result.Success)
+        {
+            LastUrl = result.Url;
+            StatusMessage = "Paste uploaded. Share the link in IRC — not the raw content.";
+        }
+        else
+        {
+            StatusIsError = true;
+            StatusMessage = result.Error;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
+    {
+        _imageStream?.Dispose();
+        _imageStream = new MemoryStream();
+        var file = e.File;
+        await file.OpenReadStream(PasteShareService.MaxImageBytes).CopyToAsync(_imageStream);
+        _imageStream.Position = 0;
+        SelectedImageName = file.Name;
+        SelectedImageSize = file.Size;
+        _imageContentType = file.ContentType;
+        StateHasChanged();
+    }
+
+    private async Task UploadImage()
+    {
+        if (_imageStream == null)
+            return;
+
+        IsUploading = true;
+        StatusMessage = "Uploading image via Tor...";
+        StatusIsError = false;
+        StateHasChanged();
+
+        _imageStream.Position = 0;
+        var result = await PasteShare.UploadImageAsync(
+            _imageStream,
+            SelectedImageName ?? "upload.png",
+            _imageContentType ?? "image/png");
+
+        IsUploading = false;
+
+        if (result.Success)
+        {
+            LastUrl = result.Url;
+            StatusMessage = "Image uploaded. Send the URL to the channel.";
+        }
+        else
+        {
+            StatusIsError = true;
+            StatusMessage = result.Error;
+        }
+
+        StateHasChanged();
+    }
+
+    private string? ResolveTarget()
+    {
+        if (!string.IsNullOrWhiteSpace(TargetChannel))
+            return TargetChannel.Trim();
+        return null;
+    }
+
+    private async Task SendUrlToChannel()
+    {
+        var target = ResolveTarget();
+        if (string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(LastUrl) || !Common.IsConnected)
+            return;
+
+        await Common.ircClient.SendMessageAsync(target, LastUrl);
+        Toast.Show($"Sent link to {target}", ToastLevel.Info);
+    }
+
+    private async Task CopyUrl()
+    {
+        if (!string.IsNullOrWhiteSpace(LastUrl))
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", LastUrl);
+    }
+
+    public void Dispose()
+    {
+        _imageStream?.Dispose();
+    }
+}

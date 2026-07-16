@@ -9,12 +9,17 @@ public class IrcUser
     public string Username { get; set; }
     public string Hostname { get; set; }
     public string Host { get; set; }
-    public IrcUser(string nickname, string username = "", string hostname = "", string host = "")
+    public string Prefix { get; set; } = "";
+
+    public string DisplayNick => $"{Prefix}{Nick}";
+
+    public IrcUser(string nickname, string username = "", string hostname = "", string host = "", string prefix = "")
     {
         Nick = nickname;
         Username = username;
         Hostname = hostname;
         Host = host;
+        Prefix = prefix;
     }
 
     public static IrcUser FromPrefix(string prefix)
@@ -37,8 +42,7 @@ public class IrcUser
             }
         }
 
-        return new IrcUser(nick, user, host);
-
+        return new IrcUser(nick, user, host, host);
     }
 
 
@@ -47,5 +51,8 @@ public class IrcUser
 public static class IrcUserExtensions
 {
     public static bool HostIsIP(this IrcUser user)
-        => System.Net.IPAddress.TryParse(user.Host, out _);
+    {
+        var host = !string.IsNullOrWhiteSpace(user.Hostname) ? user.Hostname : user.Host;
+        return System.Net.IPAddress.TryParse(host, out _);
+    }
 }

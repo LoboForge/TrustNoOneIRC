@@ -19,6 +19,7 @@ namespace LoboForge.TNOIRC.Models
     public enum WindowType
     {
         Channel,
+        System,
         Join,
         Log,
         PM,
@@ -30,6 +31,7 @@ namespace LoboForge.TNOIRC.Models
         CTF,
         ImageTools,
         IpWhois,
-        ToxChat
+        ToxChat,
+        Share
     }
 }

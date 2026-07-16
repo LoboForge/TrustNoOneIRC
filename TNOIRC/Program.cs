@@ -10,18 +10,17 @@ using Microsoft.AspNetCore.Http.Connections;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Electron.NET bootstrapping
 builder.WebHost.UseElectron(args);
 builder.WebHost.UseEnvironment("Development");
 
-// Blazor services
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<ToastService>();
+builder.Services.AddSingleton<ToxicService>();
+builder.Services.AddSingleton<PasteShareService>();
 
 var app = builder.Build();
 
-// Error handling
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
@@ -36,17 +35,9 @@ app.MapBlazorHub(options =>
 });
 app.MapFallbackToPage("/_Host");
 
-// Set up IRC client
-Common.ircClient = new IrcClientService(
-    host: "Envidia.local",
-    port: 6667,
-    nick: "LoboForge",
-    user: "mIRCUser",
-    dispatcher: Common.Dispatcher
-);
 ConfigService.Load();
-//BotService.LoadBots();
-// Start Electron app and create window
+BotService.LoadBots();
+
 if (HybridSupport.IsElectronActive)
 {
     Task.Run(async () =>

@@ -1,5 +1,9 @@
 @using LoboForge.TNOIRC.Models
+@using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
+@implements IDisposable
+@inject ToxicService Toxic
+@inject IJSRuntime JSRuntime
 
 <div class="chat-window-content d-flex flex-column">
     <div class="chat-messages flex-grow-1 overflow-auto" @ref="MessagesDiv">
@@ -7,7 +11,7 @@
         {
             <div class="chat-message">
                 <span class="timestamp">[@msg.Timestamp.ToShortTimeString()]</span>
-                <span class="user">@msg.Sender:</span>
+                <span class="user">@msg.Sender.Nick:</span>
                 <span class="text">
                     @foreach (var line in msg.Content.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
                     {
@@ -34,31 +38,30 @@
 </div>
 
 @code {
-    [Inject] private ToxicService Toxic { get; set; } = default!;
-    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
-
     private string CurrentMessage = "";
     private ElementReference MessagesDiv;
     private List<ChatMessage> ToxMessages = new();
     private bool ShowSystemMessages = true;
+    private Action<string>? _outputHandler;
 
     protected override void OnInitialized()
     {
-        base.OnInitialized();
-        Toxic.OnOutput += HandleToxOutput;
+        _outputHandler = HandleToxOutput;
+        Toxic.OnOutput += _outputHandler;
         Toxic.Start();
     }
 
     private void HandleToxOutput(string line)
     {
         if (!ShowSystemMessages && line.StartsWith("["))
-            return; // filter system lines like "[ERR]" or "[DEBUG]"
+            return;
 
         var msg = new ChatMessage(
             DateTime.UtcNow,
-            new IrcUser("TOX", "", ""), // re-use IrcUser for now
+            new IrcUser("TOX", "", ""),
             "TOX",
-            line);
+            line,
+            false);
 
         InvokeAsync(async () =>
         {
@@ -90,6 +93,12 @@
 
     private async Task ScrollToBottom()
     {
-        await InvokeAsync(() => JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv));
+        await JSRuntime.InvokeVoidAsync("scrollToBottom", MessagesDiv);
+    }
+
+    public void Dispose()
+    {
+        if (_outputHandler != null)
+            Toxic.OnOutput -= _outputHandler;
     }
 }

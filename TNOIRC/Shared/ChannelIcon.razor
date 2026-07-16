@@ -15,5 +15,11 @@
     [Parameter] public EventCallback<IrcChannel> OnOpen { get; set; }
 
     private void HandleClick() => OnOpen.InvokeAsync(Channel);
-    private string GetInitial() => string.IsNullOrWhiteSpace(Channel.Name) ? "?" : Channel.Name[1].ToString().ToUpper();
+    private string GetInitial()
+    {
+        if (string.IsNullOrWhiteSpace(Channel.Name))
+            return "?";
+
+        return Channel.Name.TrimStart('#', '&').FirstOrDefault().ToString().ToUpperInvariant();
+    }
 }

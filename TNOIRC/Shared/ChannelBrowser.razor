@@ -1,39 +1,113 @@
-﻿<h4>Toxic Terminal</h4>
+﻿@using LoboForge.TNOIRC
+@using LoboForge.TNOIRC.Models
+@using LoboForge.TNOIRC.Services
+@using LoboForge.TNOIRC.Shared
+@implements IDisposable
 
-<div style="background:black; color:lime; font-family:monospace; height:400px; overflow-y:auto; padding:10px;">
-    @foreach (var line in Output)
-    {
-        <div>@line</div>
-    }
+<div class="chat-window-content d-flex flex-column">
+    <div class="d-flex gap-2 mb-2">
+        <button class="btn btn-sm btn-outline-primary" @onclick="RefreshList" disabled="@(!Common.IsConnected)">
+            Refresh Channel List
+        </button>
+        <span class="text-muted align-self-center">
+            @(IsLoading ? "Loading..." : $"{Channels.Count} channels")
+        </span>
+    </div>
+
+    <div class="input-group mb-3">
+        <input class="form-control" placeholder="#channel" @bind="JoinName" @onkeydown="HandleJoinKey" />
+        <button class="btn btn-primary" @onclick="JoinManual" disabled="@(!Common.IsConnected)">Join</button>
+    </div>
+
+    <div class="flex-grow-1 overflow-auto">
+        @if (!Common.IsConnected)
+        {
+            <p class="text-muted">Connect to an IRC server first.</p>
+        }
+        else if (Channels.Count == 0)
+        {
+            <p class="text-muted">Click refresh to fetch the server channel list.</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var channel in Channels.OrderBy(c => c.Name))
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>@channel.Name</strong>
+                            <span class="text-muted ms-2">(@channel.UserCount users)</span>
+                            @if (!string.IsNullOrWhiteSpace(channel.Topic))
+                            {
+                                <div class="small text-muted">@channel.Topic</div>
+                            }
+                        </div>
+                        <button class="btn btn-sm btn-outline-success" @onclick="() => JoinExisting(channel.Name)">
+                            Join
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
 </div>
 
-<input @bind="Command" @bind:event="oninput" @onkeydown="HandleEnter" placeholder="Type command..." style="width:100%;" />
-
 @code {
-    private List<string> Output = new();
-    private string Command = "";
-    ToxicService toxicService;
+    private List<IrcChannel> Channels { get; set; } = new();
+    private string JoinName = string.Empty;
+    private bool IsLoading;
 
     protected override void OnInitialized()
     {
-        toxicService = new ToxicService();
-        Toxic.OnOutput += line =>
-        {
-            InvokeAsync(() =>
-            {
-                Output.Add(line);
-                StateHasChanged();
-            });
-        };
-        Toxic.Start();
+        EventBus.Subscribe<ChannelListReceivedEvent>(OnChannelListReceived);
     }
 
-    private void HandleEnter(KeyboardEventArgs e)
+    private async Task RefreshList()
     {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(Command))
-        {
-            Toxic.SendCommand(Command);
-            Command = "";
-        }
+        if (!Common.IsConnected)
+            return;
+
+        IsLoading = true;
+        StateHasChanged();
+        await Common.ircClient.RequestChannelListAsync();
+    }
+
+    private void OnChannelListReceived(ChannelListReceivedEvent evt)
+    {
+        Channels = evt.Channels;
+        IsLoading = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task JoinExisting(string channelName)
+    {
+        if (!Common.IsConnected)
+            return;
+
+        await Common.ircClient.JoinChannelAsync(channelName);
+    }
+
+    private async Task JoinManual()
+    {
+        if (string.IsNullOrWhiteSpace(JoinName) || !Common.IsConnected)
+            return;
+
+        var channel = JoinName.Trim();
+        if (!channel.StartsWith("#") && !channel.StartsWith("&"))
+            channel = "#" + channel;
+
+        await Common.ircClient.JoinChannelAsync(channel);
+        JoinName = string.Empty;
+    }
+
+    private async Task HandleJoinKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await JoinManual();
+    }
+
+    public void Dispose()
+    {
+        EventBus.Unsubscribe<ChannelListReceivedEvent>(OnChannelListReceived);
     }
 }

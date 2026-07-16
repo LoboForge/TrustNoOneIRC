@@ -20,6 +20,7 @@
     <Compile Remove="Bots\GoblinTestBot.cs" />
     <Compile Remove="Bots\PlayerProfile.cs" />
     <Compile Remove="Bots\PlayerService.cs" />
+    <Compile Remove="Services\ToxClientService.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="appicon.png" />

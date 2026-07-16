@@ -3,14 +3,18 @@ using System.Diagnostics;
 public class ToxicService
 {
     private Process? _toxicProcess;
+    private bool _started;
 
     public event Action<string>? OnOutput;
 
     public void Start(string args = "")
     {
+        if (_started && _toxicProcess is { HasExited: false })
+            return;
+
         var psi = new ProcessStartInfo
         {
-            FileName = "torsocks", // or "toxic" directly
+            FileName = "torsocks",
             Arguments = $"./toxic/build/toxic {args}",
             RedirectStandardOutput = true,
             RedirectStandardInput = true,
@@ -31,9 +35,17 @@ public class ToxicService
                 OnOutput?.Invoke($"[ERR] {e.Data}");
         };
 
-        _toxicProcess.Start();
-        _toxicProcess.BeginOutputReadLine();
-        _toxicProcess.BeginErrorReadLine();
+        try
+        {
+            _toxicProcess.Start();
+            _toxicProcess.BeginOutputReadLine();
+            _toxicProcess.BeginErrorReadLine();
+            _started = true;
+        }
+        catch (Exception ex)
+        {
+            OnOutput?.Invoke($"[ERR] Failed to start toxic: {ex.Message}");
+        }
     }
 
     public void SendCommand(string cmd)
@@ -47,7 +59,11 @@ public class ToxicService
 
     public void Stop()
     {
-        _toxicProcess?.Kill();
+        if (_toxicProcess is { HasExited: false })
+            _toxicProcess.Kill();
+
         _toxicProcess?.Dispose();
+        _toxicProcess = null;
+        _started = false;
     }
 }

@@ -16,6 +16,39 @@ This project brings a modern UI, hardened opsec, and the classic power of IRC to
 - 🪟 **Multi-Window Tabbed UI**: Each channel, PM, or server console lives in its own tab.
 - 🧙‍♂️ **Stylized Hacker Theme**: Matrix-green, smoked glass, and bold lines.  
 - 💻 **Cross-Platform**: Fully packaged builds for **Windows** and **Linux (AppImage + Snap)**.
+- 📋 **Tor-routed paste & image share**: Upload text/images via HTTPS over Tor — **no DCC** (see below).
+
+---
+
+## 🚫 Why There Is No DCC
+
+**DCC (Direct Client-to-Client) is intentionally not supported** and will not be added.
+
+DCC file and chat transfers are **peer-to-peer**. During a transfer, IRC clients exchange IP addresses and connect directly — bypassing the server and **defeating Tor**. That leaks your real network identity to the remote peer even when IRC itself is tunneled.
+
+TNO IRC is designed for **opsec-first** use:
+
+| Approach | IP exposure | Supported |
+|----------|-------------|-----------|
+| DCC SEND / CHAT | Direct P2P — **leaks IP** | ❌ Never |
+| IRC over Tor + TLS | Hidden via SOCKS | ✅ |
+| HTTPS paste/image link over Tor | Hidden via SOCKS | ✅ |
+
+**Instead of DCC**, use the built-in **Paste / Image Share** tool (dock icon) or slash commands:
+
+- Upload **text** → [paste.rs](https://paste.rs) via Tor
+- Upload **images** → [0x0.st](https://0x0.st) via Tor
+- Post the returned **URL** in channel — recipients fetch over their own connection
+
+Uploads require a running Tor SOCKS proxy (`127.0.0.1:9050` or `9150`). If Tor is not available, uploads are **blocked** rather than falling back to a direct connection that would leak your IP.
+
+### Share commands
+
+```
+/paste              Open the share window
+/paste some text    Upload text and post the link to the current channel
+/share              Same as /paste
+```
 
 ---
 
@@ -57,11 +90,59 @@ _"You're in a dark room... connected to an IRC server... over Tor... with cert-b
 
 ---
 
-### 🔧 Run Locally
+### 🐧 Linux quick setup (Tor + client cert)
+
+If your IRC certificates live in `/home/wrath/Keys` (or another folder), use the setup script:
 
 ```bash
-git clone https://github.com/yourname/tno-irc-client.git
-cd tno-irc-client
+git clone https://github.com/LoboForge/TrustNoOneIRC.git
+cd TrustNoOneIRC
+./scripts/setup-local-linux.sh
+```
+
+The script checks dependencies, builds the solution, and writes `~/.config/LoboForge.TNOIRC/config.json` with a **Libera (local)** profile using your cert.
+
+**Expected key layout** (any one of these in your keys folder):
+
+| Layout | Files |
+|--------|--------|
+| PKCS#12 (recommended) | `irc.pfx` or `irc.p12` |
+| PEM pair | `irc.crt` + `irc.key` (same folder) |
+
+Optional environment variables before running the script:
+
+```bash
+export KEYS_DIR=/home/wrath/Keys      # default
+export IRC_NICK=wrath                 # default
+export IRC_USER=wrath                 # default
+export IRC_CERT_PASSWORD=             # only if your .pfx is password-protected
+export TOR_SOCKS=9050                   # 9050 = system Tor, 9150 = Tor Browser
+./scripts/setup-local-linux.sh
+```
+
+**Start the app** after setup:
+
+```bash
+cd TNOIRC
+export PATH="$PATH:$HOME/.dotnet/tools"
+electronize start
+```
+
+First connect checklist:
+
+1. Tor running (`sudo systemctl start tor` or Tor Browser open)
+2. Connection window → profile **Libera (local)** → Connect
+3. New cert? Register with NickServ: `openssl x509 -in /home/wrath/Keys/irc.crt -outform DER | sha512sum` then `/msg NickServ CERT ADD <fingerprint>`
+
+---
+
+### 🔧 Run Locally (manual)
+
+```bash
+git clone https://github.com/LoboForge/TrustNoOneIRC.git
+cd TrustNoOneIRC/TNOIRC
+dotnet tool install ElectronNET.CLI -g
+export PATH="$PATH:$HOME/.dotnet/tools"
 electronize start
 ```
 
@@ -89,12 +170,19 @@ Built files will appear under `bin/Desktop/`.
 
 ## 🔐 Certificate Authentication (SASL EXTERNAL)
 
+There is **no SSH key authentication** in this client. IRC certificate login uses X509 client certificates over TLS with SASL EXTERNAL.
+
 ```bash
 openssl req -x509 -newkey rsa:4096 -keyout irc.key -out irc.crt -days 365 -nodes -subj "/CN=YourNick"
 openssl pkcs12 -export -out irc.pfx -inkey irc.key -in irc.crt
 ```
 
-Then connect normally, and register your fingerprint with:
+Supported certificate formats in the connection profile:
+
+- `.pfx` / `.p12` (recommended) — password optional
+- `.crt` / `.cert` / `.pem` — must have a matching `.key` file in the same directory
+
+Then connect with **TLS + SASL + Client Certificate** enabled, and register your fingerprint with:
 
 ```
 /msg NickServ CERT ADD <your sha512 fingerprint>
@@ -102,9 +190,25 @@ Then connect normally, and register your fingerprint with:
 
 ---
 
+## 🧅 Tor on Linux
+
+The client uses SOCKS5 on `127.0.0.1:9050` (system Tor) or `127.0.0.1:9150` (Tor Browser). It auto-detects an already-running proxy.
+
+If Tor is not running, install and start it:
+
+```bash
+sudo apt install tor
+sudo systemctl start tor
+```
+
+Or start Tor Browser before connecting. The bundled `tor/torrc` is used when the app launches its own Tor process.
+
+---
+
 ## 🧠 Tips
 
 - Use `/whois YourNick` to verify that your cert was accepted.
+- Use **Paste / Image Share** (dock) to send files without DCC — links only, Tor-routed uploads.
 - All bots implement `IBot` and can respond to events or PMs — check the `BotScripts` folder for samples.
 
 ---

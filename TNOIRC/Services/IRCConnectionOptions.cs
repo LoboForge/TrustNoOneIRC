@@ -7,4 +7,7 @@
     public string? SaslPassword { get; set; }
     public string? ClientCertPath { get; set; }
     public string? ClientCertPassword { get; set; }
+    public string? ServerPassword { get; set; }
+    public bool AutoReconnect { get; set; } = true;
+    public int ReconnectDelaySeconds { get; set; } = 5;
 }

@@ -2,8 +2,6 @@
 @using LoboForge.TNOIRC.Models
 @using LoboForge.TNOIRC.Services
 @using LoboForge.TNOIRC.Shared
-IRC.Services
-@using LoboForge.TNOIRC.Shared
 @implements IDisposable
 
 <div class="container mt-3">
@@ -72,7 +70,7 @@ IRC.Services
             <div class="row g-3 mt-2">
                 <div class="col-md-6">
                     <label class="form-label">SASL Username</label>
-                    <input class="form-control" @bind="SelectedServer.SaslUsername" />
+                    <input class="form-control" @bind="SelectedServer.SaslUsername" placeholder="For SASL PLAIN (optional with cert)" />
                 </div>
 
                 <div class="col-md-6">
@@ -80,25 +78,38 @@ IRC.Services
                     <input type="password" class="form-control" @bind="SelectedServer.SaslPassword" />
                 </div>
             </div>
+        }
 
-            <div class="form-check form-switch mt-3">
-                <input class="form-check-input" type="checkbox" id="useCert" @bind="SelectedServer.UseClientCert">
-                <label class="form-check-label" for="useCert">Use Client Certificate</label>
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" id="autoReconnect" @bind="SelectedServer.AutoReconnect">
+            <label class="form-check-label" for="autoReconnect">Auto-reconnect on disconnect</label>
+        </div>
+
+        <div class="row g-3 mt-2">
+            <div class="col-md-6">
+                <label class="form-label">Server Password (PASS)</label>
+                <input type="password" class="form-control" @bind="SelectedServer.ServerPassword" />
             </div>
+        </div>
 
-            @if (SelectedServer.UseClientCert)
-            {
-                <div class="row g-3 mt-2">
-                    <div class="col-md-6">
-                        <label class="form-label">Client Cert Path</label>
-                        <input class="form-control" @bind="SelectedServer.ClientCertPath" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Client Cert Password</label>
-                        <input type="password" class="form-control" @bind="SelectedServer.ClientCertPassword" />
-                    </div>
+        <div class="form-check form-switch mt-3">
+            <input class="form-check-input" type="checkbox" id="useCert" @bind="SelectedServer.UseClientCert">
+            <label class="form-check-label" for="useCert">Use Client Certificate (TLS + SASL EXTERNAL)</label>
+        </div>
+
+        @if (SelectedServer.UseClientCert)
+        {
+            <div class="row g-3 mt-2">
+                <div class="col-md-6">
+                    <label class="form-label">Certificate Path</label>
+                    <input class="form-control" @bind="SelectedServer.ClientCertPath" placeholder="/path/to/irc.pfx or irc.crt + irc.key" />
+                    <small class="text-muted">Use .pfx/.p12, or .crt/.cert/.pem with a matching .key file in the same folder.</small>
                 </div>
-            }
+                <div class="col-md-6">
+                    <label class="form-label">Certificate Password</label>
+                    <input type="password" class="form-control" @bind="SelectedServer.ClientCertPassword" placeholder="Only required for .pfx/.p12" />
+                </div>
+            </div>
         }
         @if (SelectedServer != null)
         {
@@ -122,10 +133,16 @@ IRC.Services
             </div>
         }
 
-        <div class="mt-4 d-flex gap-3">
-            <button class="btn btn-primary" @onclick="Connect">🔌 Connect</button>
+        <div class="mt-4 d-flex gap-3 flex-wrap">
+            <button class="btn btn-primary" @onclick="Connect" disabled="@Common.IsConnected">🔌 Connect</button>
+            <button class="btn btn-warning" @onclick="Disconnect" disabled="@(!Common.IsConnected)">⏏ Disconnect</button>
             <button class="btn btn-outline-secondary" @onclick="SaveProfile">💾 Save</button>
         </div>
+
+        @if (Common.IsConnected)
+        {
+            <p class="text-success mt-2 mb-0">Connected to @Common.ircClient.Host as @Common.ircClient.Nick</p>
+        }
     }
 </div>
 
@@ -172,10 +189,19 @@ IRC.Services
         ConfigService.Save();
     }
 
-    private void Connect()
+    private async Task Connect()
     {
         var s = SelectedServer;
         if (s == null) return;
+
+        if (Common.IsConnected)
+            await Common.ircClient.DisconnectAsync("Switching servers", reconnect: false);
+
+        if (s.UseClientCert)
+        {
+            s.UseTls = true;
+            s.UseSasl = true;
+        }
 
         var options = new IrcConnectionOptions
         {
@@ -185,7 +211,9 @@ IRC.Services
             SaslUsername = s.SaslUsername,
             SaslPassword = s.SaslPassword,
             ClientCertPath = s.UseClientCert ? s.ClientCertPath : null,
-            ClientCertPassword = s.UseClientCert ? s.ClientCertPassword : null
+            ClientCertPassword = s.UseClientCert ? s.ClientCertPassword : null,
+            ServerPassword = s.ServerPassword,
+            AutoReconnect = s.AutoReconnect
         };
 
         Common.ircClient = new IrcClientService(
@@ -199,6 +227,12 @@ IRC.Services
 
         ConfigService.Save();
         Common.ircClient.StartService();
+    }
+
+    private async Task Disconnect()
+    {
+        if (Common.IsConnected)
+            await Common.ircClient.DisconnectAsync("User disconnect", reconnect: false);
     }
 
     protected virtual void Dispose(bool disposing)

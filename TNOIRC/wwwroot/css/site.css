@@ -272,6 +272,39 @@ select:focus {
     padding: 0 0.3rem;
 }
 
+.connection-status {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9998;
+    padding: 4px 12px;
+    font-size: 0.8rem;
+    font-family: monospace;
+    text-align: center;
+}
+
+.status-connected { background: rgba(0, 128, 0, 0.85); color: #fff; }
+.status-connecting { background: rgba(255, 165, 0, 0.85); color: #000; }
+.status-reconnecting { background: rgba(255, 140, 0, 0.9); color: #000; }
+.status-disconnected { background: rgba(80, 80, 80, 0.85); color: #eee; }
+
+.highlight-msg {
+    background: rgba(255, 255, 0, 0.12);
+    border-left: 3px solid #cc0;
+    padding-left: 4px;
+}
+
+.user-prefix {
+    color: #888;
+    font-size: 0.75rem;
+}
+
+.chat-message a {
+    color: #66ccff;
+    text-decoration: underline;
+}
+
 .show-users-btn {
     font-size: 0.85rem;
     padding: 0.25rem 0.5rem;
